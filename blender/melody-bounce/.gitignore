@@ -1,3 +1,6 @@
 build/
 renders/
 __pycache__/
+# your MIDI files stay out of the repo: most songs are under copyright
+songs/*
+!songs/.gitkeep
