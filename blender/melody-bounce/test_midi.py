@@ -31,6 +31,12 @@ class ParseTest(unittest.TestCase):
         notes = midi.parse(smf(track(b'\x00\x90\x3c\x64', b'\x83\x60\x3c\x00', b'\x00\x40\x50', b'\x83\x60\x40\x00')))
         self.assertEqual([(n.pitch, n.velocity, n.end) for n in notes], [(60, 100, 0.5), (64, 80, 1.0)])
 
+    def test_keeps_the_track_each_note_is_written_in(self):
+        notes = midi.parse(smf(track(TEMPO_120),
+                               track(b'\x00\x90\x43\x64', b'\x83\x60\x80\x43\x00'),    # G4, upper
+                               track(b'\x00\x90\x40\x64', b'\x83\x60\x80\x40\x00')))   # E4, lower
+        self.assertEqual([(n.pitch, n.track) for n in notes], [(67, 1), (64, 2)])
+
     def test_keeps_ticks_time_and_key_signature(self):
         song = midi.parse_song(smf(track(b'\x00\xff\x58\x04\x03\x02\x18\x08', b'\x00\xff\x59\x02\xfe\x00',
                                          b'\x00\x90\x3c\x64', b'\x81\x70\x80\x3c\x00')))

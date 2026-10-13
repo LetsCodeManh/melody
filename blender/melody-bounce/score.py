@@ -58,17 +58,31 @@ def signature(song):
 
 
 def chords(song):
-    """Notes below middle C go to the bass staff, with the middle C and D the left hand plays; within a staff, notes
-    sharing an onset and a length become one chord. Returns (treble, bass), each sorted by start."""
+    """A file written in two tracks has a staff each, the lower track the bass; otherwise notes below middle C go to the
+    bass staff, with the middle C and D the left hand plays. Within a staff, notes sharing an onset and a length become
+    one chord. Returns (treble, bass), each sorted by start."""
     step = song.division / GRID
     spans = [(round(n.tick / step), max(1, round(n.ticks / step)), n.pitch) for n in song.notes]
-    placed = [(bass, start, length) for bass, (start, length, _) in zip(_in_bass(spans), spans)]
+    staffs = _by_track(song.notes) or _in_bass(spans)
+    placed = [(bass, start, length) for bass, (start, length, _) in zip(staffs, spans)]
     staves = _grouped(song, placed)
     if max(len(voices(staff)) for staff in staves) > MAX_VOICES:
         # notes held on past the ones after them, as a sequencer's sustain: each prints only up to the next onset on
         # its staff (the sound keeps their full length)
         staves = _grouped(song, _held_to_next(placed))
     return staves
+
+
+def _by_track(notes):
+    """For each note: whether it goes to the bass staff, by the track it is written in, when the file has two; None
+    otherwise (one track for both hands, or a part each for many instruments)."""
+    tracks = {}
+    for n in notes:
+        tracks.setdefault(n.track, []).append(n.pitch)
+    if len(tracks) != 2:
+        return None
+    lower = min(tracks, key=lambda t: sum(tracks[t]) / len(tracks[t]))
+    return [n.track == lower for n in notes]
 
 
 def _in_bass(spans):
@@ -102,7 +116,8 @@ def _grouped(song, placed):
 
 
 def voices(staff):
-    """Spread chords over as few voices as possible so no voice holds two chords at once; longer chords go first."""
+    """Spread chords over as few voices as possible so no voice holds two chords at once; longer chords go first. The
+    highest voice comes first, as it is printed stems up."""
     out = []
     for c in sorted(staff, key=lambda c: (c.start, -c.length)):
         free = next((v for v in out if v[-1].start + v[-1].length <= c.start), None)
@@ -110,7 +125,8 @@ def voices(staff):
             out.append([c])
         else:
             free.append(c)
-    return out or [[]]
+    pitches = [[p for c in v for p in c.pitches] for v in out]
+    return [v for _, v in sorted(zip(pitches, out), key=lambda pv: -sum(pv[0]) / len(pv[0]))] or [[]]
 
 
 def pitch_name(pitch, key):
@@ -120,7 +136,11 @@ def pitch_name(pitch, key):
     return name + ("'" * octave if octave > 0 else ',' * -octave)
 
 
-def lengths(steps):
+def lengths(steps, into_beat=0, beat=GRID):
+    """Steps as tied note values; one starting into_beat steps past a beat is first tied over at the next beat."""
+    if into_beat:
+        first = min(steps, beat - into_beat)
+        return lengths(first) + (lengths(steps - first) if steps > first else [])
     out = []
     for size, name in LENGTHS:
         while steps >= size:
@@ -139,9 +159,9 @@ class Source:
     def add(self, text):
         self.lines.append(text)
 
-    def event(self, indent, chord, steps, rest):
+    def event(self, indent, chord, steps, rest, into_beat=0, beat=GRID):
         """One chord (or rest) on its own line, split into tied lengths."""
-        parts = lengths(steps)
+        parts = lengths(steps, into_beat, beat)
         for k, length in enumerate(parts):
             if chord is None:
                 self.add(indent + rest + length)
@@ -158,6 +178,7 @@ def write(song, path):
     beats, unit, pickup = meter.find(song, GRID)
     key = signature(song)
     bar = beats * GRID * 4 // unit
+    beat = GRID * 3 // 2 if unit == 8 and beats % 3 == 0 else GRID * 4 // unit  # 6/8, 12/8: a dotted quarter
     end = max(c.start + c.length for staff in chords(song) for c in staff)
     end += -(end - pickup) % bar
     src = Source()
@@ -175,20 +196,35 @@ def write(song, path):
             command = ('\\voiceOne', '\\voiceTwo', '\\voiceThree', '\\voiceFour')[v % 4] if len(vs) > 1 else ''
             src.add(f'\\new Voice {{ {command}')
             at = 0
-            for c in voice:
-                if c.start > at:
-                    src.event('  ', None, c.start - at, 'r' if v == 0 else 's')
-                named = c._replace(pitches=[pitch_name(p, key) for p in c.pitches])
-                src.event('  ', named, c.length, '')
+            for c in voice + [Chord(end, 0, [], [])]:
+                for start, stop, rest in _gap(staff, at, c.start, v == 0, beat):
+                    src.event('  ', None, stop - start, rest, (start - pickup) % beat, beat)
+                if c.length:
+                    named = c._replace(pitches=[pitch_name(p, key) for p in c.pitches])
+                    src.event('  ', named, c.length, '', (c.start - pickup) % beat, beat)
                 at = c.start + c.length
-            if end > at:
-                src.event('  ', None, end - at, 'r' if v == 0 else 's')
             src.add('}')
         src.add('>> }')
     src.add('>> \\layout { } }')
     with open(path, 'w') as f:
         f.write('\n'.join(src.lines) + '\n')
     return src
+
+
+def _gap(staff, start, stop, first, beat):
+    """A voice's gap as (start, stop, 'r' or 's') stretches: a rest shows where the whole staff is silent (in its first
+    voice only), or as a breath of less than a beat in the voice's own line; elsewhere it is skipped, invisible, as
+    the other voices carry on."""
+    sounding = sorted((max(c.start, start), min(c.start + c.length, stop)) for c in staff
+                      if c.start < stop and c.start + c.length > start)
+    out, at = [], start
+    for a, b in sounding + [(stop, stop)]:
+        if a > at:
+            out.append((at, a, 'r' if first else 's'))
+        if b > max(a, at):
+            out.append((max(a, at), b, 'r' if stop - start < beat else 's'))
+        at = max(at, b)
+    return out
 
 
 def engrave(ly):

@@ -27,9 +27,18 @@ class ChordsTest(unittest.TestCase):
                                     (6, 2, 57), (6, 2, 64), (6, 2, 72)))  # E4 stays on the treble staff
         self.assertEqual([c.pitches for c in bass], [[57], [48], [57]])
 
+    def test_a_file_written_in_two_tracks_prints_each_on_its_own_staff(self):
+        # Bach's Prelude in C: the left hand holds C4 and E4 under the right hand's arpeggio, which reaches down to D3
+        written = song((0, 8, 60), (1, 7, 64), (2, 1, 67), (3, 1, 72), (4, 1, 76), (5, 1, 50))
+        written = written._replace(notes=[n._replace(track=t) for n, t in zip(written.notes, (2, 2, 1, 1, 1, 1))])
+        treble, bass = score.chords(written)
+        self.assertEqual([c.pitches for c in treble], [[67], [72], [76], [50]])
+        self.assertEqual([c.pitches for c in bass], [[60], [64]])
+
     def test_overlapping_chords_get_their_own_voice(self):
         treble, _ = score.chords(song((0, 8, 62), (0, 2, 69), (2, 2, 70), (8, 4, 62)))
-        self.assertEqual([[c.pitches[0] for c in v] for v in score.voices(treble)], [[62, 62], [69, 70]])
+        # the higher voice first: it is printed stems up
+        self.assertEqual([[c.pitches[0] for c in v] for v in score.voices(treble)], [[69, 70], [62, 62]])
 
     def test_a_staff_needing_more_than_four_voices_prints_each_note_up_to_the_next_onset(self):
         # a sequencer's sustain: chords a beat apart, each held for four and a quarter beats
@@ -42,6 +51,24 @@ class ChordsTest(unittest.TestCase):
     def test_four_voices_are_left_as_written(self):
         treble, _ = score.chords(song((0, 16, 60), (0, 12, 64), (0, 8, 67), (0, 4, 72), (4, 4, 74)))
         self.assertEqual(sorted(c.length for c in treble), [4, 4, 8, 12, 16])
+
+
+class RestsTest(unittest.TestCase):
+    def voices(self, *notes):
+        with tempfile.TemporaryDirectory() as folder:
+            ly = os.path.join(folder, 'x.ly')
+            score.write(song(*notes), ly)
+            text = open(ly).read()
+        treble = text.split('\\new Staff')[1].split('\\new Voice')[1:]
+        return [' '.join(line.strip() for line in v.splitlines()[1:] if line.strip() not in ('}', '>> }')) for v in treble]
+
+    def test_a_voice_rests_visibly_only_for_a_breath_in_its_line_or_where_the_staff_is_silent(self):
+        # Chopin's dotted top note over a chord held a quarter, then the chord alone for a half, then a silent beat
+        top, chord = self.voices((0, 3, 75), (3, 1, 74), (0, 4, 67), (0, 4, 72), (4, 8, 67), (4, 8, 72))
+        self.assertEqual((top, chord), ("<ees''>8. <d''>16 s2 r4", "<g' c''>4 <g' c''>2 s4"))
+        # Bach's held E coming in a sixteenth after the half note under it: the breath shows, as in the print
+        held, under = self.voices((0, 8, 60), (1, 7, 64))
+        self.assertEqual((held, under), ("r16 <e'>8.~ <e'>4 r2", "<c'>2 s2"))
 
 
 class CheckWrittenTest(unittest.TestCase):
@@ -85,6 +112,12 @@ class SpellingTest(unittest.TestCase):
         self.assertEqual(score.lengths(6), ['4.'])
         self.assertEqual(score.lengths(5), ['4', '16'])
         self.assertEqual(score.lengths(40), ['1.', '1'])
+
+    def test_a_length_starting_off_the_beat_is_tied_over_at_the_beat(self):
+        # Bach's held E: a sixteenth past the beat, seven sixteenths long
+        self.assertEqual(score.lengths(7, 1, 4), ['8.', '4'])
+        self.assertEqual(score.lengths(2, 1, 4), ['8'])
+        self.assertEqual(score.lengths(9, 3, 6), ['8.', '4.'])  # in 6/8, the beat a dotted quarter
 
 
 class PrintedTest(unittest.TestCase):

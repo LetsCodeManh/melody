@@ -4,7 +4,8 @@
 from collections import namedtuple
 import struct
 
-Note = namedtuple('Note', 'start end pitch velocity tick ticks', defaults=(0, 0))  # tick, ticks: start and length
+# tick, ticks: start and length; track: the file's track it is written in (a written piano score has one per staff)
+Note = namedtuple('Note', 'start end pitch velocity tick ticks track', defaults=(0, 0, 0))
 Song = namedtuple('Song', 'notes division time key')  # time: (beats, beat unit), the longest in force; key: sharps (+) or flats (-), None if the file has none
 
 CHORD_WINDOW = 0.02  # seconds: onsets closer than this count as one chord
@@ -31,10 +32,10 @@ def parse_song(data):
     if division & 0x8000:
         raise ValueError('SMPTE time division is not supported')
     pos, events = 8 + size, []  # events: (tick, order, kind, a, b, c)
-    for _ in range(ntracks):
+    for number in range(ntracks):
         chunk, size = struct.unpack('>4sI', data[pos:pos + 8])
         if chunk == b'MTrk':
-            events += _track(data[pos + 8:pos + 8 + size])
+            events += _track(data[pos + 8:pos + 8 + size], number)
         pos += 8 + size
     events.sort(key=lambda e: (e[0], e[1]))
     time = _longest([(tick, (a, b)) for tick, _, kind, a, b, _ in events if kind == 'time'], events[-1][0] if events else 0)
@@ -61,7 +62,7 @@ def _varlen(data, i):
             return value, i
 
 
-def _track(data):
+def _track(data, number):
     i, tick, status, out = 0, 0, None, []
     while i < len(data):
         delta, i = _varlen(data, i)
@@ -95,10 +96,11 @@ def _track(data):
             i += 2
             if channel == DRUMS:
                 continue
+            # a note is ended in the track and channel it was started in
             if kind == 0x90 and b > 0:
-                out.append((tick, 2, 'on', channel, a, b))
+                out.append((tick, 2, 'on', (number, channel), a, b))
             elif kind == 0x80 or kind == 0x90:
-                out.append((tick, 1, 'off', channel, a, 0))  # offs sort before ons on the same tick
+                out.append((tick, 1, 'off', (number, channel), a, 0))  # offs sort before ons on the same tick
     return out
 
 
@@ -114,7 +116,7 @@ def _notes(events, division):
             held.setdefault((a, b), []).append((seconds, c, tick))
         elif kind == 'off' and held.get((a, b)):
             start, velocity, start_tick = held[(a, b)].pop(0)
-            notes.append(Note(start, seconds, b, velocity, start_tick, tick - start_tick))
+            notes.append(Note(start, seconds, b, velocity, start_tick, tick - start_tick, a[0]))
     notes.sort(key=lambda n: (n.start, -n.pitch))
     return notes
 
