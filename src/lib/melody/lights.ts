@@ -7,7 +7,7 @@ import { INK, type Prepared } from './melody';
 // sized by weight, tails by speed, heads cooling to embers and going dark
 const COMET_GLOW = 14;
 const COMET_WIDTH = 0.15; // bevel radius at the comet's head, for a note of middling weight
-// the hot white at a lit head's centre, and a touch of it in the comets
+// the hot white at a fresh head's centre, and a touch of it in the comets
 const CORE = new THREE.Color(1.0, 0.9, 0.75);
 const CORE_SHARE = 0.25; // of a comet's colour
 const TAIL_TIME = 0.3; // s of flight the tail shows: a fast comet streaks, a slow one is a short spark
@@ -229,8 +229,11 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 					: t < 0.0 ? flash * (t + uFrame) / uFrame
 					: t < SETTLE ? mix(flash, SUSTAIN, t / SETTLE)
 					: steady;
-				// a white-hot spot in the middle, the note's colour all round it
-				gl_FragColor = vec4(vec3(0.01) + mix(CORE, vLook.rgb, smoothstep(0.0, 0.45, vRim)) * glow, 1.0);
+				// a white-hot spot in the middle, the note's colour all round it, shrinking away as the head cools to an
+				// ember: only the note's colour is left to fade
+				float hot = clamp((glow - EMBER) / (SUSTAIN - EMBER), 0.0, 1.0);
+				float core = 1.0 - smoothstep(0.0, max(0.45 * hot, 1e-3), vRim);
+				gl_FragColor = vec4(vec3(0.01) + mix(vLook.rgb, CORE, core) * glow, 1.0);
 			}`
 	});
 }
