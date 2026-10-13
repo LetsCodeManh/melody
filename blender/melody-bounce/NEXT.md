@@ -3,7 +3,7 @@
 Read this first in the next session on the melody page (`/melody?song=<name>`, dev server on port 5190).
 
 ## State
-All committed on branch `melody-bounce`, nothing pending:
+All committed on branch `melody-bounce`, nothing pending (later work under "Done since" below):
 - `e78fddf` refuse played MIDIs, sustained notes printed to the next onset, key signature from the notes
 - `68774a9` middle C and D go with the left-hand chord they are struck in
 - `9d81179` delete a song from the picker (⌘⌫ or the trash button; the MIDI goes to the macOS Trash)
@@ -39,11 +39,22 @@ The tab's peak on a switch did not move (~350 MB, ~175 after GC): the garbage wa
 big buffers waiting for a full GC (the new WAV and its decoded audio, the last song's audio, the uploaded mesh), bounded,
 not a leak.
 
+## Done since: the glow fades out
+- `56ce3c5` pools of light dim as newer notes land (`poolShare` in `landings.ts`, eased in over 0.15 s) instead of
+  switching off when the GLOWS-th newer one takes the light; the heads cool to an ember, then back to ink over 8 s.
+- `b6bae1a` the white-hot core of a lit head shrinks away as it cools, so only the note's colour is left to fade.
+- `a84fe08` the harder a key is struck, the wider its ripple (`strike` in `looks.ts`: velocity alone; the weight, i.e.
+  length too, when a file has one velocity throughout).
+
+## Done since: deleting the last song, checked
+Headless Chrome, server faked to a one-song library (the server side is pinned by `songs.server.spec.ts`): ⌘⌫ in the
+picker sends the DELETE, the score goes black, "No songs yet…" shows, keys do nothing, no console errors. The picker
+says "No songs yet" (was "No song matches"), the player bar 0:00 / 0:00 (was -0:03, the stage's last time).
+
 ## Next, in order
 1. **GPU work.** The depth-of-field pass renders the whole score (2.1 M vertices) a second time each frame. Measure
    frame time on a long song before touching it.
-2. **Small:** deleting the last song (empty state) was never verified; after a GPU reset the freed meshes can't be
-   re-uploaded, so a "reload the page" message would help.
+2. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
 
 ## Skipped on purpose (YAGNI)
 More than two staves for orchestras (everything folds into piano staves); streaming the audio (risks the sync);
