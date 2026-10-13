@@ -9,8 +9,8 @@ It runs in two places from one prepared song:
 - **Live** in the browser at `/melody?song=<name>` (three.js, `src/lib/melody/`), the default.
 - **As a video** rendered in Blender (`make.py`), on request.
 
-How to add a song, preview and render it is in the `melody-video` skill (`.claude/skills/melody-video`). Where work
-left off is in `NEXT.md`.
+How to put a song on the site is in the top-level README ("Add a song to the site"); how to preview and render a video
+of it is in the `melody-video` skill (`.claude/skills/melody-video`).
 
 ## The idea, and why it holds together
 - **Sync by construction.** The audio is synthesized from the same notes the comets land on (`synth.py`, a soft
