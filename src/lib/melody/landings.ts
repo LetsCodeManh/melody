@@ -1,0 +1,161 @@
+import * as THREE from 'three';
+import type { Look } from './looks';
+import { INK, type Prepared } from './melody';
+
+// What a comet does to the page as it lands (lengths in staff spaces, times in s), heavier notes harder
+const RIPPLE_REACH = 2.2; // radius a ring spreads to, for a note of middling weight
+const RIPPLE_WIDTH = 0.12;
+const RIPPLE_LIFE = 0.8;
+const RIPPLE_GLOW = 2.5;
+const SPARKS = 10; // most per landing: the lightest notes throw 3
+const SPARK_SIZE = 0.16;
+const SPARK_LIFE = 0.55;
+const SPARK_GLOW = 14;
+const GRAVITY = 30;
+const DRAG = 4; // per s: sparks skid to a stop on the paper
+
+export interface Landings {
+	/** On the paper: a ring of light spreading from each landing. */
+	ripples: THREE.Mesh;
+	/** Over everything: sparks thrown up by each landing, falling back and skidding out. */
+	sparks: THREE.Points;
+	setViewHeight(px: number): void;
+}
+
+/** Ripples and sparks for every landing, moved on the GPU by the shared time uniform, as the comets are. */
+export function createLandings(song: Prepared, looks: Look[], time: { value: number }): Landings {
+	const ripples = new THREE.Mesh(rippleGeometry(song, looks), rippleMaterial(time));
+	const height = { value: 1 };
+	const sparks = new THREE.Points(sparkGeometry(song, looks), sparkMaterial(time, height));
+	ripples.frustumCulled = sparks.frustumCulled = false;
+	return { ripples, sparks, setViewHeight: (px) => void (height.value = px) };
+}
+
+/** A square on the paper around each landing, as wide as its ring gets; the shader draws the ring in it. */
+function rippleGeometry({ flights }: Prepared, looks: Look[]) {
+	const position = new Float32Array(flights.length * 4 * 3);
+	const corner = new Float32Array(flights.length * 4 * 2);
+	const land = new Float32Array(flights.length * 4);
+	const look = new Float32Array(flights.length * 4 * 4);
+	const index: number[] = [];
+	flights.forEach(([note, , t, , , x, y], f) => {
+		const { colour, weight } = looks[note];
+		const reach = RIPPLE_REACH * (0.5 + weight) + RIPPLE_WIDTH;
+		[[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([cx, cy], k) => {
+			const v = f * 4 + k;
+			position.set([x + cx * reach, y + cy * reach, INK + 0.002], v * 3);
+			corner.set([cx * reach, cy * reach], v * 2);
+			land[v] = t;
+			look.set([colour.r, colour.g, colour.b, weight], v * 4);
+		});
+		index.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3);
+	});
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.BufferAttribute(position, 3));
+	g.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+	g.setAttribute('aLand', new THREE.BufferAttribute(land, 1));
+	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
+	g.setIndex(index);
+	return g;
+}
+
+function rippleMaterial(time: { value: number }) {
+	return new THREE.ShaderMaterial({
+		uniforms: { uTime: time },
+		vertexShader: /* glsl */ `
+			attribute vec2 aCorner;
+			attribute float aLand;
+			attribute vec4 aLook;
+			varying vec2 vAt;
+			varying float vLand;
+			varying vec4 vLook;
+			void main() {
+				vAt = aCorner;
+				vLand = aLand;
+				vLook = aLook;
+				gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+			}`,
+		fragmentShader: /* glsl */ `
+			uniform float uTime;
+			varying vec2 vAt;
+			varying float vLand;
+			varying vec4 vLook;
+			const float REACH = ${RIPPLE_REACH.toFixed(4)}, WIDTH = ${RIPPLE_WIDTH.toFixed(4)};
+			const float LIFE = ${RIPPLE_LIFE.toFixed(4)}, GLOW = ${RIPPLE_GLOW.toFixed(4)};
+			void main() {
+				float age = (uTime - vLand) / LIFE;
+				if (age < 0.0 || age > 1.0) discard;
+				// fast out, slowing as it spreads, fading as it goes
+				float front = REACH * (0.5 + vLook.w) * (1.0 - pow(1.0 - age, 3.0));
+				float ring = smoothstep(WIDTH, 0.0, abs(length(vAt) - front));
+				gl_FragColor = vec4(vLook.rgb * GLOW * ring * pow(1.0 - age, 2.0), 1.0);
+			}`,
+		transparent: true,
+		blending: THREE.AdditiveBlending,
+		depthWrite: false
+	});
+}
+
+/** Each spark: where and when it's thrown, and how fast, from a seeded random so every play throws the same. */
+function sparkGeometry({ flights }: Prepared, looks: Look[]) {
+	let seed = 1;
+	const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+	const count = flights.length * SPARKS;
+	const start = new Float32Array(count * 3);
+	const velocity = new Float32Array(count * 3);
+	const look = new Float32Array(count * 4);
+	flights.forEach(([note, , land, , , x, y], f) => {
+		const { colour, weight } = looks[note];
+		const thrown = 3 + (SPARKS - 3) * weight;
+		for (let k = 0; k < SPARKS; k++) {
+			const v = f * SPARKS + k;
+			const [angle, speed, up] = [2 * Math.PI * random(), (1.5 + 2.5 * random()) * (0.6 + 0.8 * weight), 2 + 3 * random()];
+			start.set([x, y, land], v * 3);
+			velocity.set([speed * Math.cos(angle), speed * Math.sin(angle), up], v * 3);
+			// the ones past what this note throws are never shown
+			look.set([colour.r, colour.g, colour.b, k < thrown ? 1 : 0], v * 4);
+		}
+	});
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+	g.setAttribute('aStart', new THREE.BufferAttribute(start, 3));
+	g.setAttribute('aVelocity', new THREE.BufferAttribute(velocity, 3));
+	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
+	return g;
+}
+
+function sparkMaterial(time: { value: number }, height: { value: number }) {
+	return new THREE.ShaderMaterial({
+		uniforms: { uTime: time, uHeight: height },
+		vertexShader: /* glsl */ `
+			uniform float uTime, uHeight;
+			attribute vec3 aStart;     // x, y, time thrown
+			attribute vec3 aVelocity;
+			attribute vec4 aLook;      // colour, shown
+			varying vec3 vColour;
+			const float LIFE = ${SPARK_LIFE.toFixed(4)}, SIZE = ${SPARK_SIZE.toFixed(4)}, GLOW = ${SPARK_GLOW.toFixed(4)};
+			const float GRAVITY = ${GRAVITY.toFixed(4)}, DRAG = ${DRAG.toFixed(4)}, LIFT = ${INK.toFixed(4)};
+			void main() {
+				float age = uTime - aStart.z;
+				float left = (age >= 0.0 && age < LIFE) ? (1.0 - age / LIFE) * aLook.w : 0.0;
+				vec2 slide = aVelocity.xy * (1.0 - exp(-DRAG * age)) / DRAG;
+				float z = max(LIFT + aVelocity.z * age - 0.5 * GRAVITY * age * age, LIFT);
+				vec4 view = viewMatrix * vec4(aStart.xy + slide, z, 1.0);
+				gl_Position = projectionMatrix * view;
+				// world size to pixels: the projection's focal length over the distance, times half the buffer height
+				gl_PointSize = left > 0.0 ? SIZE * left * projectionMatrix[1][1] * 0.5 * uHeight / -view.z : 0.0;
+				vColour = aLook.rgb * GLOW * pow(left, 1.5);
+			}`,
+		fragmentShader: /* glsl */ `
+			varying vec3 vColour;
+			void main() {
+				float d = length(gl_PointCoord - 0.5);
+				if (d > 0.5) discard;
+				gl_FragColor = vec4(vColour * smoothstep(0.5, 0.2, d), 1.0);
+			}`,
+		transparent: true,
+		blending: THREE.AdditiveBlending,
+		depthTest: false,
+		depthWrite: false
+	});
+}

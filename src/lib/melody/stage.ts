@@ -4,13 +4,18 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { createLights, COLOUR, INK, type Lights } from './lights';
-import { framingAt, type Prepared } from './melody';
+import { createLights, COLOUR, type Lights } from './lights';
+import { createPulse, noteLooks } from './looks';
+import { framingAt, INK, type Prepared } from './melody';
 import { scoreGeometry } from './score';
 
 /** Blender's 50 mm lens on its 36 mm sensor: the width it shows is what settings.SHOT was measured with. */
 const HORIZONTAL_FOV = 2 * Math.atan(18 / 50);
 const LAMP_POWER = 70; // candela, at staff-space distances: tuned against the Blender stills
+const BLOOM = 0.3;
+// how much the lamp and the glow swell as the music lands: the room breathes with it
+const LAMP_SWELL = 0.5; // share of LAMP_POWER
+const BLOOM_SWELL = 0.35;
 const PAPER = new THREE.Color(0.78, 0.75, 0.7);
 const INK_COLOUR = new THREE.Color(0.008, 0.008, 0.008);
 
@@ -45,6 +50,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	const overlay = new THREE.Scene(); // the comets, after the depth of field
 	let song: Prepared | undefined;
 	let lights: Lights | undefined;
+	let pulse = (_t: number) => 0;
 
 	// MSAA on the composer's buffers: the staff lines are thin
 	const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
@@ -55,12 +61,13 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	const comets = new RenderPass(overlay, camera);
 	comets.clear = false;
 	composer.addPass(comets);
-	const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0, 1.2);
+	const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM, 0, 1.2);
 	// a glow hugging the lights, as Blender's: the widest blurs would spread hundreds of lit heads into a haze
 	bloom.compositeMaterial.uniforms.bloomFactors.value = [1.0, 0.6, 0.15, 0.03, 0.0];
 	composer.addPass(bloom);
 	composer.addPass(new OutputPass());
 
+	const buffer = new THREE.Vector2();
 	const resize = () => {
 		const { clientWidth: w, clientHeight: h } = host;
 		if (!w || !h) return;
@@ -70,6 +77,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		// keep Blender's horizontal view whatever the window's shape, so every comet the framing allows for is in shot
 		camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(HORIZONTAL_FOV / 2) / camera.aspect));
 		camera.updateProjectionMatrix();
+		lights?.setViewHeight(renderer.getDrawingBufferSize(buffer).y);
 	};
 	const observer = new ResizeObserver(resize);
 	observer.observe(host);
@@ -87,6 +95,9 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		camera.lookAt(centre, settings.staffMid, 0);
 		(focus.uniforms as { focus: { value: number } }).focus.value = offset.length();
 		lamp.position.set(centre + settings.lamp[0], settings.staffMid + settings.lamp[1], settings.lamp[2]);
+		const swell = pulse(t);
+		lamp.intensity = LAMP_POWER * (1 + LAMP_SWELL * swell);
+		bloom.strength = BLOOM + BLOOM_SWELL * swell;
 		lights.setTime(t);
 		composer.render();
 	});
@@ -101,13 +112,16 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			paper.scale.set(length + 120, 320, 1);
 			paper.position.set(length / 2, 80, 0);
 			if (lights) {
-				scene.remove(lights.heads);
-				overlay.remove(lights.comets);
+				scene.remove(lights.paper);
+				overlay.remove(lights.overlay);
 				lights.dispose();
 			}
-			lights = createLights(next);
-			scene.add(lights.heads);
-			overlay.add(lights.comets);
+			const looks = noteLooks(next);
+			lights = createLights(next, looks);
+			lights.setViewHeight(renderer.getDrawingBufferSize(buffer).y);
+			pulse = createPulse(next, looks);
+			scene.add(lights.paper);
+			overlay.add(lights.overlay);
 		},
 		dispose() {
 			renderer.setAnimationLoop(null);

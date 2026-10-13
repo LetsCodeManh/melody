@@ -1,3 +1,6 @@
+/** How far the print stands off the paper: settings.INK / settings.SPACE. */
+export const INK = 0.03;
+
 /** A song as prepare.py writes it, in page units (staff spaces, y up) and seconds from the first note. */
 export interface Prepared {
 	page: { box: number };
@@ -6,6 +9,8 @@ export interface Prepared {
 	flights: [number, number, number, number, number, number, number][];
 	/** note, time, x, y: the heads a note is tied on to, lit when the music reaches them */
 	held: [number, number, number, number][];
+	/** per note, by the index flights and held refer to: MIDI pitch, velocity (1-127), length in s */
+	notes: [number, number, number][];
 	/** one sample per frame from -lead: the page x looked at, and how far back the camera stands (1 = nearest) */
 	camera: { centre: number[]; back: number[] };
 	settings: {

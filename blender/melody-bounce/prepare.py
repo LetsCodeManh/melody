@@ -37,6 +37,7 @@ def prepare(path):
                      'arc': flight.ARC, 'maxArc': flight.MAX_ARC},
         'flights': [[f.note, f.launch, f.land, *f.origin, *f.target] for f in flights],
         'held': [[h.note, t, h.x, -h.y] for h, t in held_at],
+        'notes': [[n.pitch, n.velocity, round(n.end - n.start, 4)] for n in song.notes],
     }
     with open(out + '.json', 'w') as f:
         json.dump(data, f)
