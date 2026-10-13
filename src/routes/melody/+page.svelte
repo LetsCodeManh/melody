@@ -11,7 +11,8 @@
 	import AddSong from '#lib/melody/player/AddSong.svelte';
 	import Card from '#lib/melody/player/Card.svelte';
 	import { screenAt, withCurtain } from '#lib/melody/curtain.ts';
-	import { actionFor, type Action } from '#lib/melody/player/shortcuts.ts';
+	import { actionFor, SHORTCUTS, type Action } from '#lib/melody/player/shortcuts.ts';
+	import { library } from '#lib/melody/library.ts';
 	import { SKINS, skinAfter, type Skin } from '#lib/melody/player/skins.ts';
 	import { AFTERWARDS, afterwardsAfter, songAfter, type Afterwards } from '#lib/melody/player/afterwards.ts';
 
@@ -19,7 +20,10 @@
 	const SKIP = 5; // s the arrow keys jump
 	const TITLE = 3000; // ms a song played on to shows its title before it starts
 	const SLOW = 300; // ms a song may take to open before the loading card shows: a prepared one opens without a flash
-	const NO_SONGS = 'No songs yet: press A to add a .mid, or drop one on the page.';
+	const songsAt = library(import.meta.env.DEV);
+	const NO_SONGS = songsAt.editable ? 'No songs yet: press A to add a .mid, or drop one on the page.' : 'No songs published yet.';
+	// the built site plays only published songs: adding one is `pnpm dev` on the machine with Python and LilyPond
+	const shortcuts = SHORTCUTS.filter((s) => songsAt.editable || s.action !== 'add');
 
 	let host: HTMLDivElement;
 	let stage: Stage | undefined;
@@ -69,11 +73,11 @@
 		error = '';
 		setPreparing(true);
 		try {
-			const base = `/api/melody/${encodeURIComponent(name)}`;
-			const data: Prepared = await (await fetchOk(base)).json();
+			const files = songsAt.files(name);
+			const data: Prepared = await (await fetchOk(files.data)).json();
 			const [svg, wav] = await Promise.all([
-				fetchOk(`${base}/score.svg`).then((r) => r.text()),
-				fetchOk(`${base}/audio.wav`).then((r) => r.arrayBuffer())
+				fetchOk(files.score).then((r) => r.text()),
+				fetchOk(files.audio).then((r) => r.arrayBuffer())
 			]);
 			const sound = await audio!.decodeAudioData(wav);
 			if (ticket !== loading) return; // another song was picked meanwhile
@@ -154,7 +158,7 @@
 			const res = await fetch('/api/melody', { method: 'POST', body: form });
 			const body = await res.json().catch(() => null);
 			if (!res.ok) throw new Error(body?.message ?? res.statusText);
-			songs = await (await fetchOk('/api/melody')).json();
+			songs = await (await fetchOk(songsAt.list)).json();
 			say(`Added ${body.song}`);
 			pick(body.song);
 		} catch (e) {
@@ -167,7 +171,7 @@
 		try {
 			await fetchOk(`/api/melody/${encodeURIComponent(name)}`, { method: 'DELETE' });
 			const at = songs.indexOf(name);
-			songs = await (await fetchOk('/api/melody')).json();
+			songs = await (await fetchOk(songsAt.list)).json();
 			say(`Moved ${name.replaceAll('-', ' ')} to the Trash`);
 			if (name !== song) return;
 			song = songs[Math.min(at, songs.length - 1)] ?? '';
@@ -191,7 +195,8 @@
 
 	function onDrop(e: DragEvent) {
 		if (!dragsFiles(e)) return;
-		e.preventDefault();
+		e.preventDefault(); // even where it can't be added: the browser would leave the page to open the file
+		if (!songsAt.editable) return say('Songs are added where the site is built from: see the README');
 		const file = e.dataTransfer!.files[0];
 		if (file) addSong(file);
 	}
@@ -212,7 +217,7 @@
 		previous: () => songs.length && pick(songs[(songs.indexOf(song) - 1 + songs.length) % songs.length]),
 		afterwards: () => setAfterwards(afterwardsAfter(afterwards)),
 		songs: () => ((helping = false), (picking = true)),
-		add: openAdding,
+		add: () => songsAt.editable && openAdding(),
 		hide: () => {
 			hidden = !hidden;
 			if (hidden) say('Player hidden · H to show it');
@@ -250,7 +255,7 @@
 			playing = playback?.playing ?? false;
 			return t;
 		});
-		fetchOk('/api/melody')
+		fetchOk(songsAt.list)
 			.then((r) => r.json())
 			.then((list: string[]) => {
 				songs = list;
@@ -298,7 +303,7 @@
 		onSongs={() => (picking = true)}
 	/>
 
-	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={openAdding} onDelete={deleteSong} />{/if}
+	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={songsAt.editable ? openAdding : undefined} onDelete={songsAt.editable ? deleteSong : undefined} />{/if}
 	<input
 		class="chooser"
 		type="file"
@@ -311,7 +316,7 @@
 			if (file) addSong(file);
 		}}
 	/>
-	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
+	{#if helping}<Shortcuts {shortcuts} onClose={() => (helping = false)} />{/if}
 	{#if adding}<AddSong onChoose={() => chooser.click()} onClose={() => (adding = false)} />{/if}
 
 	<Card {screen} {song} {waited} {afterwards} />

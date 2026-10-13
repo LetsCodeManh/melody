@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { access, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -11,6 +11,8 @@ const ROOT = path.resolve('blender/melody-bounce');
 const SONGS = path.join(ROOT, 'songs');
 const BUILD = path.join(ROOT, 'build');
 const TRASH = path.join(os.homedir(), '.Trash'); // macOS: Finder's Put Back finds it there
+// the songs the deployed site plays: it has no Python or LilyPond to prepare any (pnpm publish-song)
+const PUBLISHED = path.resolve('static/songs');
 // a change to any of these changes what prepare.py writes
 const SOURCES = ['prepare.py', 'midi.py', 'meter.py', 'score.py', 'flight.py', 'synth.py', 'settings.py'].map((f) => path.join(ROOT, f));
 const NAME = /^[\w-]+$/;
@@ -124,4 +126,27 @@ export async function preparedForRequest(song: string): Promise<PreparedFiles> {
 		const stderr = (e as { stderr?: string }).stderr?.trim().split('\n').slice(-3).join('\n');
 		error(500, stderr || (e as Error).message);
 	}
+}
+
+/** Copies a song, prepared first when it needs to be, to where the deployed site finds it: <to>/<song>/song.json (what
+ * the page gets), score.svg and audio.wav. Then lists it in <to>/index.json. Throws for a name that isn't a song. */
+export async function publishSong(song: string, to = PUBLISHED): Promise<void> {
+	const data = await prepared(song);
+	const dir = path.join(to, song);
+	await mkdir(dir, { recursive: true });
+	await Promise.all([
+		writeFile(path.join(dir, 'song.json'), JSON.stringify(forPage(data))),
+		// without LilyPond's point-and-click links: they draw nothing, and each holds this machine's path to the song
+		readFile(data.score, 'utf8').then((svg) => writeFile(path.join(dir, 'score.svg'), svg.replace(/<a [^>]*>|<\/a>/g, ''))),
+		copyFile(data.wav, path.join(dir, 'audio.wav'))
+	]);
+	await writePublishedList(to);
+}
+
+/** Writes <to>/index.json, the published songs: one per folder there, so deleting a song's folder unpublishes it. */
+export async function writePublishedList(to = PUBLISHED): Promise<string[]> {
+	await mkdir(to, { recursive: true });
+	const songs = (await readdir(to, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+	await writeFile(path.join(to, 'index.json'), JSON.stringify(songs));
+	return songs;
 }

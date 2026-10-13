@@ -1,8 +1,8 @@
-import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkMidi, moveToTrash, songName } from './songs.server';
+import { checkMidi, moveToTrash, songName, writePublishedList } from './songs.server';
 
 describe('songName', () => {
 	it('names a song from its file in lower-case words joined by dashes', () => {
@@ -54,5 +54,19 @@ describe('moveToTrash', () => {
 		const { root, song } = await folders();
 		await expect(moveToTrash(song, path.join(root, 'no-trash'))).rejects.toThrow(/ENOENT/);
 		expect(await readdir(root)).toEqual(['tune.mid']);
+	});
+});
+
+describe('writePublishedList', () => {
+	it('lists one song per folder, in order, whatever else lies there', async () => {
+		const to = await mkdtemp(path.join(os.tmpdir(), 'published-'));
+		await Promise.all(['satie', 'bach'].map((s) => mkdir(path.join(to, s))));
+		await writeFile(path.join(to, '.DS_Store'), '');
+		expect(await writePublishedList(to)).toEqual(['bach', 'satie']);
+		expect(JSON.parse(await readFile(path.join(to, 'index.json'), 'utf8'))).toEqual(['bach', 'satie']);
+	});
+	it('makes an empty list where nothing was published yet', async () => {
+		const to = path.join(await mkdtemp(path.join(os.tmpdir(), 'published-')), 'songs');
+		expect(await writePublishedList(to)).toEqual([]);
 	});
 });

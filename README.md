@@ -21,6 +21,17 @@ One song ships as a demo: Bach's Prelude No. 1 in C (BWV 846), public domain, fr
 [Mutopia Project](https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=5). Your own MIDIs stay out of git: most songs
 are under copyright. Mutopia has many more free piano pieces.
 
+## Put it online
+A deployed site (Vercel, Netlify…) can't prepare songs: that takes Python and LilyPond. Prepare them on your machine
+and publish the ones the site should play, then commit and push:
+
+```bash
+pnpm publish-song bach-prelude-in-c
+```
+
+It copies the song into `static/songs/`, which the built site plays from; there, songs can't be added or deleted. To
+take one off, delete its folder in `static/songs/` and run `pnpm publish-song` on its own.
+
 ## Video
 Rendering a video also needs [Blender](https://www.blender.org) and ffmpeg:
 

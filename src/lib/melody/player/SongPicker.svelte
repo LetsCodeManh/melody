@@ -6,10 +6,10 @@
 		current: string;
 		onPick: (song: string) => void;
 		onClose: () => void;
-		/** asks for a .mid to add to the songs */
-		onAdd: () => void;
-		/** moves the song to the Trash */
-		onDelete: (song: string) => void;
+		/** asks for a .mid to add to the songs; without it, songs can't be added */
+		onAdd?: () => void;
+		/** moves the song to the Trash; without it, songs can't be deleted */
+		onDelete?: (song: string) => void;
 	}
 
 	let { songs, current, onPick, onClose, onAdd, onDelete }: Props = $props();
@@ -28,7 +28,7 @@
 			e.preventDefault();
 			at = (chosen + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % Math.max(shown.length, 1);
 		} else if (e.key === 'Enter' && shown[chosen]) onPick(shown[chosen]);
-		else if (e.key === 'Backspace' && e.metaKey && shown[chosen]) {
+		else if (e.key === 'Backspace' && e.metaKey && onDelete && shown[chosen]) {
 			e.preventDefault(); // Finder's Move to Trash, not clearing the search
 			onDelete(shown[chosen]);
 		}
@@ -56,7 +56,7 @@
 					<button class="song" class:chosen={i === chosen} class:current={name === current} onclick={() => onPick(name)} onpointermove={() => (at = i)} tabindex="-1">
 						{name.replaceAll('-', ' ')}
 					</button>
-					{#if i === chosen}
+					{#if i === chosen && onDelete}
 						<button class="trash" onclick={() => onDelete(name)} tabindex="-1" aria-label="Move {name.replaceAll('-', ' ')} to the Trash" title="Move to the Trash (⌘⌫)">
 							<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4M3 4h10M4.5 4l.7 9.2a1 1 0 0 0 1 .8h3.6a1 1 0 0 0 1-.8L11.5 4M6.8 6.5v5M9.2 6.5v5" /></svg>
 						</button>
@@ -66,7 +66,7 @@
 				<li class="none">{songs.length ? 'No song matches' : 'No songs yet'}</li>
 			{/each}
 		</ul>
-		<button class="add" onclick={onAdd}>Add a song <span>.mid, or drop one on the page</span></button>
-		<p class="hint">↑ ↓ to move · Enter to play · ⌘⌫ to delete · Esc to close</p>
+		{#if onAdd}<button class="add" onclick={onAdd}>Add a song <span>.mid, or drop one on the page</span></button>{/if}
+		<p class="hint">↑ ↓ to move · Enter to play{onDelete ? ' · ⌘⌫ to delete' : ''} · Esc to close</p>
 	</div>
 </div>
