@@ -12,7 +12,7 @@ const SONGS = path.join(ROOT, 'songs');
 const BUILD = path.join(ROOT, 'build');
 const TRASH = path.join(os.homedir(), '.Trash'); // macOS: Finder's Put Back finds it there
 // a change to any of these changes what prepare.py writes
-const SOURCES = ['prepare.py', 'midi.py', 'score.py', 'flight.py', 'synth.py', 'settings.py'].map((f) => path.join(ROOT, f));
+const SOURCES = ['prepare.py', 'midi.py', 'meter.py', 'score.py', 'flight.py', 'synth.py', 'settings.py'].map((f) => path.join(ROOT, f));
 const NAME = /^[\w-]+$/;
 const LARGEST = 2 * 1024 * 1024; // bytes: a long piano piece is well under 200 KB
 

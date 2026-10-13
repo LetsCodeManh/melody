@@ -25,6 +25,7 @@ left off is in `NEXT.md`.
 songs/<song>.mid
   └ prepare.py  (pure Python + LilyPond, ~10 s plus the audio)
       midi.py      reads the notes, drops drums
+      meter.py     finds the bars: meter and pickup
       score.py     refuses played MIDIs, splits the hands, writes LilyPond, engraves the SVG, finds every notehead
       flight.py    plans one comet per note, then the camera's framing
       synth.py     renders the WAV
@@ -42,6 +43,11 @@ songs/<song>.mid
   staff.
 - **Key signature** from the file. A file without one gets the signature (up to six sharps or flats) that leaves the
   fewest notes needing an accidental.
+- **Meter** (`meter.py`). Exporters write 4/4 when nobody set a meter, so a file's lone 4/4 is ignored and the bars
+  come from the notes: the bar length and offset that put the bass strikes, chords and long notes on beat one win.
+  That gives 4/4, 3/4, 6/8 or 12/8, plus a pickup. 4/4 with no pickup stays unless another reading fits 25% better.
+  Any other meter in the file is kept, and only its pickup is found. Songs under 16 quarters keep the file's meter.
+  Not handled: meter changes mid-song, odd meters found from the notes, triplets.
 - Positions: page units are **staff spaces**, y up. In Blender one staff space is 5 cm (`SPACE`), so a one-minute score
   is about 30 m long.
 

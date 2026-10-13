@@ -3,6 +3,7 @@
 # links on the SVG's noteheads point back to those positions, which is how a head is matched to its note.
 from collections import Counter, namedtuple
 import bisect, os, re, subprocess
+import meter
 
 Chord = namedtuple('Chord', 'start length pitches notes')  # start, length in grid steps; notes: indices into song.notes
 Head = namedtuple('Head', 'note x y')                       # centre of the head; SVG units (staff spaces), y down
@@ -154,11 +155,11 @@ class Source:
 
 def write(song, path):
     """The LilyPond source for the song, written to path; returns the Source with its heads and held maps."""
-    beats, unit = song.time
+    beats, unit, pickup = meter.find(song, GRID)
     key = signature(song)
     bar = beats * GRID * 4 // unit
     end = max(c.start + c.length for staff in chords(song) for c in staff)
-    end += -end % bar
+    end += -(end - pickup) % bar
     src = Source()
     src.add('\\version "2.24.0"')
     src.add('\\header { tagline = ##f }')
@@ -168,7 +169,8 @@ def write(song, path):
     src.add('\\score { \\new PianoStaff <<')
     for clef, staff in zip(('treble', 'bass'), chords(song)):
         vs = voices(staff)
-        src.add(f'\\new Staff {{ \\clef {clef} \\key {TONICS[key]} \\major \\time {beats}/{unit} <<')
+        partial = f' \\partial 16*{pickup}' if pickup else ''
+        src.add(f'\\new Staff {{ \\clef {clef} \\key {TONICS[key]} \\major \\time {beats}/{unit}{partial} <<')
         for v, voice in enumerate(vs):
             command = ('\\voiceOne', '\\voiceTwo', '\\voiceThree', '\\voiceFour')[v % 4] if len(vs) > 1 else ''
             src.add(f'\\new Voice {{ {command}')

@@ -107,6 +107,22 @@ class EngraveTest(unittest.TestCase):
         self.assertEqual({h.note for h in held}, {4})
         self.assertTrue(all(h.x > by_note[4].x for h in held))
 
+    def test_a_waltz_with_a_pickup_is_barred_in_three_after_it(self):
+        # a quarter before the first bar, then oom-pah-pah; the last note is held from beat two over the barline
+        waltz = [(4 + 12 * b + t, 4, p) for b in range(5) for t, p in ((0, 48), (4, 64), (8, 64))]
+        s = song((0, 4, 67), *waltz, (64, 4, 48), (68, 12, 72))
+        with tempfile.TemporaryDirectory() as folder:
+            ly = os.path.join(folder, 'waltz.ly')
+            mapped = score.write(s, ly)
+            with open(ly) as f:
+                text = f.read()
+            svg = score.engrave(ly)
+            heads = score.noteheads(svg, mapped)
+            held = score.held_heads(svg, mapped)
+        self.assertIn('\\time 3/4 \\partial 16*4', text)
+        self.assertEqual(len(heads), len(s.notes))
+        self.assertEqual({h.note for h in held}, {len(s.notes) - 1})  # only the last crosses a barline
+
 
 if __name__ == '__main__':
     unittest.main()
