@@ -95,5 +95,5 @@ songs/<song>.mid
   per frame.
 - Memory (All of Me, Retina): tab ~200 MB, GPU ~1.2 GB. MSAA is kept only where the scene is drawn, and vertex
   buffers leave the CPU once they are on the GPU.
-- Songs can be added (press A, or drop a .mid on the page) and deleted (⌘⌫ moves it to the Trash). Songs are private: `songs/` is never
-  committed.
+- Songs can be added (press A, or drop a .mid on the page) and deleted (⌘⌫ moves it to the Trash). Only the demo song is committed: other
+  MIDIs in `songs/` stay out of git (copyright).
