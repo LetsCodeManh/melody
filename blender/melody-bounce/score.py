@@ -131,7 +131,8 @@ def voices(staff):
 
 def pitch_name(pitch, key):
     black = BLACK_FLAT if key < 0 else BLACK_SHARP if key > 0 else BLACK_PLAIN
-    name = NAMES[pitch % 12] or black[pitch % 12]
+    leading = (7 * key + 8) % 12  # the relative minor's leading tone is a sharp, even in a flat key (D minor's C#)
+    name = NAMES[pitch % 12] or (BLACK_SHARP if pitch % 12 == leading else black)[pitch % 12]
     octave = pitch // 12 - 4
     return name + ("'" * octave if octave > 0 else ',' * -octave)
 

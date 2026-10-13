@@ -102,6 +102,10 @@ class SpellingTest(unittest.TestCase):
                          ["c'", "bes'", "fis'", 'c', 'c,', "d''"])
         self.assertEqual(score.pitch_name(70, 2), "ais'")
 
+    def test_the_relative_minors_leading_tone_is_a_sharp(self):
+        self.assertEqual(score.pitch_name(61, -1), "cis'")  # D minor's C sharp, not D flat (Bach's Invention 4)
+        self.assertEqual(score.pitch_name(61, -3), "des'")  # in C minor its leading tone is B, so C sharp stays D flat
+
     def test_tied_parts_are_mapped_as_held(self):
         treble, _ = score.chords(song((0, 5, 60)))
         src = score.Source()
