@@ -29,7 +29,8 @@ def prepare(path):
     end = max(n.end for n in song.notes)
     s = settings
     times = [i / s.FPS - s.LEAD for i in range(int(math.ceil(1 + (s.LEAD + end + s.TAIL) * s.FPS)))]
-    centre, back = flight.framing(flights, times, s.SHOT, s.SHOT_MIDDLE, s.MARGIN, s.LINGER, s.SMOOTH * s.FPS)
+    centre, back = flight.framing(flights, times, s.SHOT, s.SHOT_MIDDLE, s.MARGIN, s.LINGER, s.SMOOTH * s.FPS,
+                                   s.CAMERA, s.VIEW, s.STAFF_MID)
     data = {
         'svg': score.importable(svg, out + '.blender.svg'), 'score': svg, 'wav': out + '.wav',
         'page': {'width': width, 'height': height, 'box': box},

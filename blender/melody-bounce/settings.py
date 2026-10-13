@@ -14,6 +14,7 @@ CAMERA = (-20.0, -22.0, 6.0)  # from the point it looks at, when nothing needs a
 LAMP = (-3.0, 0.0, 5.0)     # from that point
 SHOT = 19.0                 # width both staves show at the camera's nearest (measured); wider spans pull it back
 SHOT_MIDDLE = 1.75          # the middle of that view sits this far right of the point looked at
+VIEW = 18 / 50              # tan of half the horizontal view: a 50 mm lens on a 36 mm sensor
 MARGIN = 2.0                # kept clear around the comets
 LINGER = 0.4                # s a landed comet still counts as on screen
 SMOOTH = 1.0                # s: sigma of the camera's Gaussian smoothing

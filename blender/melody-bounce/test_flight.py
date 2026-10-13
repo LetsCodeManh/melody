@@ -56,11 +56,41 @@ class FramingTest(unittest.TestCase):
     def test_framing_keeps_every_comet_in_shot(self):
         fs = [flight.Flight(0, 0.0, 1.0, (0.0, 0), (4.0, 0)), flight.Flight(1, 2.0, 3.0, (4.0, 0), (60.0, 0))]
         times = [i / 10 for i in range(40)]
-        centre, back = flight.framing(fs, times, shot=20.0, middle=1.0, margin=2.0, linger=0.2, sigma=5.0)
+        centre, back = flight.framing(fs, times, shot=20.0, middle=1.0, margin=2.0, linger=0.2, sigma=5.0,
+                                      camera=(-20.0, -22.0, 6.0), view=0.36, look_y=0.0)
         for (lo, hi), c, b in zip(flight.spans(fs, times, 0.2), centre, back):
             half = 20.0 * b / 2
             self.assertLessEqual(c + 1.0 - half, lo - 2.0 + 1e-9)
             self.assertGreaterEqual(c + 1.0 + half, hi + 2.0 - 1e-9)
+
+    def test_framing_keeps_every_comet_in_shot_even_near_the_lens(self):
+        # the last comet, long enough in the air for the camera to settle, lands far below the staves: nearer the
+        # camera, where the frame is narrowest
+        fs = [flight.Flight(0, 0.0, 1.0, (0.0, -10.0), (4.0, -22.0)),
+              flight.Flight(1, 2.0, 3.0, (4.0, -22.0), (60.0, -10.0)),
+              flight.Flight(2, 6.0, 9.0, (60.0, -10.0), (72.0, -36.0))]
+        times = [i / 10 for i in range(100)]
+        camera, view = (-20.0, -22.0, 6.0), 0.36
+        centre, back = flight.framing(fs, times, shot=19.0, middle=1.75, margin=2.0, linger=0.2, sigma=5.0,
+                                      camera=camera, view=view, look_y=-16.5)
+        for t, c, b in zip(times, centre, back):
+            for f in fs:
+                if f.launch <= t <= f.land + 0.2:
+                    for x, y in (f.origin, f.target):
+                        for side in (-2.0, 2.0):
+                            # the point seen from the camera: across the frame over depth along its view
+                            d = (x + side - c, y + 16.5, 0.0)
+                            o = [a * b for a in camera]
+                            rel = [p - q for p, q in zip(d, o)]
+                            depth = -sum(r * a for r, a in zip(rel, camera)) / sum(a * a for a in camera) ** 0.5
+                            across = (rel[0] * 22.0 - rel[1] * 20.0) / (22.0 ** 2 + 20.0 ** 2) ** 0.5
+                            self.assertLessEqual(abs(across) / depth, view + 1e-9, (t, x, y))
+
+    def test_a_point_nearer_the_lens_needs_the_camera_further_back(self):
+        camera = (-20.0, -22.0, 6.0)
+        self.assertGreater(flight.pull_back(12.0, -15.0, camera, 0.36), flight.pull_back(12.0, -5.0, camera, 0.36))
+        # the nearest shot shows the bass staff's row out to about 11.5 right of the point looked at
+        self.assertAlmostEqual(flight.pull_back(11.5, -5.5, camera, 0.36), 1.0, places=2)
 
     def test_reached_maps_page_x_to_time_between_landings(self):
         fs = [flight.Flight(0, 0.0, 1.0, (0.0, 0), (4.0, 0)), flight.Flight(1, 1.0, 3.0, (4.0, 0), (8.0, 0))]

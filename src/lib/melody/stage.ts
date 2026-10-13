@@ -11,7 +11,7 @@ import { duration, framingAt, INK, type Prepared } from './melody';
 import { createPaper } from './paper';
 import { scoreGeometry } from './score';
 
-/** Blender's 50 mm lens on its 36 mm sensor: the width it shows is what settings.SHOT was measured with. */
+/** Blender's 50 mm lens on its 36 mm sensor: the view the framing allows for (settings.VIEW). */
 const HORIZONTAL_FOV = 2 * Math.atan(18 / 50);
 // a dim, neutral light high over the point looked at, falling off into the dark: the lit heads' pools do the real
 // lighting

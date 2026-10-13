@@ -66,7 +66,8 @@ songs/<song>.mid
   paper (about 11° up), looking along the score. The point looked at sits between the two staves and rides along x.
 - **Framing, per frame:** take every comet in the air (or landed in the last 0.4 s) and aim at the middle of their
   span. If the span plus a 2-staff-space margin is wider than the 19 staff spaces the nearest shot shows, the camera
-  backs off along its view by that ratio.
+  backs off along its view by that ratio. Low notes far below the bass staff are nearer the lens, where the frame is
+  narrower, so each head is also put through the real perspective and the camera backs off further if one needs it.
 - **Smooth, never late:** the pull-back gets a running maximum first, so smoothing can't cut a comet off. Then both
   aim and pull-back get Gaussian smoothing with sigma 1 s, which looks ahead as much as behind: the camera anticipates
   the music.

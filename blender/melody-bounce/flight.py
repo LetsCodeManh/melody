@@ -62,13 +62,10 @@ def arc(flight, u):
     return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, height
 
 
-def spans(flights_, times, linger):
-    """Per time, the (left, right) page x of every comet in the air or landed within linger seconds; gaps hold the
-    nearest span so the camera never loses its place."""
-    out = []
-    for t in times:
-        xs = [x for f in flights_ if f.launch <= t <= f.land + linger for x in (f.origin[0], f.target[0])]
-        out.append((min(xs), max(xs)) if xs else None)
+def in_shot(flights_, times, linger):
+    """Per time, the page (x, y) of the origin and target of every comet in the air or landed within linger seconds;
+    gaps hold the nearest so the camera never loses its place."""
+    out = [[p for f in flights_ if f.launch <= t <= f.land + linger for p in (f.origin, f.target)] for t in times]
     known = [i for i, v in enumerate(out) if v]
     if not known:
         raise ValueError('no flights')
@@ -78,15 +75,35 @@ def spans(flights_, times, linger):
     return out
 
 
-def framing(flights_, times, shot, middle, margin, linger, sigma):
-    """Per time, the page x the camera looks at and how far back it stands (1 = nearest, showing shot staff spaces
-    across with their middle at x + middle), so every comet in the air stays in shot with margin to spare; both
-    smoothed over sigma samples, the pull-back over a running maximum so it never cuts a comet off."""
-    span = spans(flights_, times, linger)
+def spans(flights_, times, linger):
+    """Per time, the (left, right) page x of every comet in shot."""
+    return [(min(x for x, _ in ps), max(x for x, _ in ps)) for ps in in_shot(flights_, times, linger)]
+
+
+def pull_back(dx, dy, camera, view):
+    """How far back (1 = nearest) a camera at offset camera from the point it looks at must stand for the page point
+    dx, dy from that point to be inside view, the tan of half its horizontal angle. The frame narrows towards the
+    lens, so a point nearer the camera needs it further back."""
+    ox, oy, oz = camera
+    across = abs(dy * ox - dx * oy) / math.hypot(ox, oy)
+    square = ox * ox + oy * oy + oz * oz
+    return (dx * ox + dy * oy + math.sqrt(square) * across / view) / square
+
+
+def framing(flights_, times, shot, middle, margin, linger, sigma, camera, view, look_y):
+    """Per time, the page x the camera looks at and how far back it stands (1 = nearest, at offset camera from the
+    point (x, look_y), showing the staves shot staff spaces across with their middle at x + middle), so every comet in
+    the air stays in shot with margin to spare, heads off the staves too: inside view, the tan of half the lens's
+    horizontal angle. Both smoothed over sigma samples, the pull-back over a running maximum so it never cuts a comet
+    off."""
+    seen = in_shot(flights_, times, linger)
+    span = [(min(x for x, _ in ps), max(x for x, _ in ps)) for ps in seen]
     centre = smooth([(lo + hi) / 2 - middle for lo, hi in span], sigma)
     # measured from the smoothed aim, not the span's own middle: smoothing leads and lags, and the shot must cover that
-    need = dilate([max(1.0, 2 * (max(hi - c, c - lo) + margin) / shot)
-                   for (lo, hi), c in zip(span, (c + middle for c in centre))], int(3 * sigma))
+    need = dilate([max([1.0, 2 * (max(hi - c - middle, c + middle - lo) + margin) / shot] +
+                       # heads below the bass staff are nearer the lens, where the frame is narrower than shot
+                       [pull_back(x + side - c, y - look_y, camera, view) for x, y in ps for side in (-margin, margin)])
+                   for ps, (lo, hi), c in zip(seen, span, centre)], int(3 * sigma))
     return centre, smooth(need, sigma)
 
 
