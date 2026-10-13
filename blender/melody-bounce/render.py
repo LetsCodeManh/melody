@@ -2,7 +2,7 @@
 # poll for <path>.done to know it finished (the file holds the render time in seconds).
 import bpy, os, time
 
-ROOT = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/renders'
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'renders')
 
 
 def kick(name='test', seconds=10, percent=50):

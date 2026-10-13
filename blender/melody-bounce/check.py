@@ -1,11 +1,11 @@
 # Checks a built Bounce scene: every comet in the air and ball rolling along a tie (and each landing spot) is inside the
 # camera's frame, and the camera moves smoothly; fails if one leaves the frame. Run after build.py in the same Blender:
-#   exec(open('/Users/manh/Developer/personal-os/visual/blender/melody-bounce/check.py').read())
-import bpy, json, sys
+#   p = '<this repo>/blender/melody-bounce/check.py'; exec(open(p).read(), {'__file__': p})
+import bpy, json, os, sys
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
-HERE = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/'
+HERE = os.path.dirname(os.path.abspath(__file__)) + '/'
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import flight, settings as cfg  # noqa: E402

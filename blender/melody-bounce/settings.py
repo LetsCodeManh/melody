@@ -1,7 +1,7 @@
 # The look and timing of the Bounce scene, shared by build.py and check.py. Distances in staff spaces unless noted.
-import sys
+import os, sys
 
-HERE = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/'
+HERE = os.path.dirname(os.path.abspath(__file__)) + '/'
 DEFAULT_SONG = HERE + 'build/interstellar.json'
 FPS = 60
 SAMPLES = 16                # EEVEE samples per frame: looks the same as 64 here at a third of the time

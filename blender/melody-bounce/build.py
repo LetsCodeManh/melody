@@ -1,12 +1,12 @@
 # Builds the melody visualisation in its own scene ('Bounce'): the engraved score on paper, a comet per note landing
 # on its head, a warm light and a low camera following the music, and the song as the scene's sound.
 # Run prepare.py on the MIDI first. Inside Blender (builds settings.DEFAULT_SONG):
-#   exec(open('/Users/manh/Developer/personal-os/visual/blender/melody-bounce/build.py').read())
+#   p = '<this repo>/blender/melody-bounce/build.py'; exec(open(p).read(), {'__file__': p})
 # or from the command line, for any prepared song: see make.py.
-import bpy, bmesh, importlib, json, math, sys
+import bpy, bmesh, importlib, json, math, os, sys
 from mathutils import Matrix, Vector
 
-HERE = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/'
+HERE = os.path.dirname(os.path.abspath(__file__)) + '/'
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import flight, lights, score, settings
