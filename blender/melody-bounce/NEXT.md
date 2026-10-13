@@ -3,7 +3,9 @@
 Read this first in the next session on the melody page (`/melody?song=<name>`, dev server on port 5190).
 
 ## State
-All committed on branch `melody-bounce`, nothing pending (later work under "Done since" below):
+All committed on branch `melody-bounce`, nothing pending (later work under "Done since" below). The pipeline changed
+with the ties, so every song re-prepares on its next load; only All of Me is prepared (Manh is pruning the library).
+Earlier:
 - `e78fddf` refuse played MIDIs, sustained notes printed to the next onset, key signature from the notes
 - `68774a9` middle C and D go with the left-hand chord they are struck in
 - `9d81179` delete a song from the picker (⌘⌫ or the trash button; the MIDI goes to the macOS Trash)
@@ -66,8 +68,31 @@ How to measure: GPU timer queries lie on ANGLE/Metal (the passes summed to 80 ms
 wait for the GPU; a pass's own cost by running it 8 more times within the frame. Picture checked by screenshots
 paused at a fixed time (repeat shots match pixel for pixel).
 
+## Done since: a song played on shows its title first
+`5f74ad4` when L plays on to the next song, its title card shows for 3 s (`TITLE` in `+page.svelte`) before it starts;
+Space, a seek or picking another song cuts the wait. "This song again" restarts at once (the end card just showed the
+title).
+
+## Done since: adding a song is a modal
+`03585e1` A, or "Add a song" in the picker, opens `AddSong.svelte`: a drop zone (click to choose) over where to find a
+.mid (Mutopia Project, MFiles, BitMidi; MuseScore left out: most of its MIDI downloads are paid) and that a played MIDI
+won't take. A file dropped on the zone goes on to the page's own drop. Checked in headless Chrome in all four skins;
+a real drag from Finder not tried.
+
+## Done since: a tied note rings on along its tie
+- `fb87276` a held head (a tie, or a note split at a barline) gets no comet, flash or ripple any more: nothing new
+  sounds there. A glint glides flat along the printed tie (`score.ties` reads its curve from the SVG, `flight.ties`
+  matches it to the two heads) from the time the music reaches the first head to when it reaches the next, then runs
+  into it; that head fills from the tie's side (live only: in Blender it just ramps up). The camera keeps both heads in
+  shot for the whole glide. All of Me: 194 glides, all 199 held heads matched; `check.py` covers the glints, 0 out of
+  frame. Tuning: `GLIDE_GLOW`, `GLIDE_WIDTH`, `GLINT`, `FILL` in `lights.ts` (and `lights.py`).
+- `193bd80` a note split at a barline was struck on whichever of its heads LilyPond printed first, sometimes the second
+  (5 notes in All of Me): now always the leftmost.
+
 ## Next, in order
-1. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
+1. **Look:** a Blender render of a glint (only the live page has been looked at), and the low-note framing on the page
+   (Nocturne, from "every comet in frame" above).
+2. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
 
 ## Skipped on purpose (YAGNI)
 More than two staves for orchestras (everything folds into piano staves); streaming the audio (risks the sync);
