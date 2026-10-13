@@ -51,10 +51,23 @@ Headless Chrome, server faked to a one-song library (the server side is pinned b
 picker sends the DELETE, the score goes black, "No songs yet…" shows, keys do nothing, no console errors. The picker
 says "No songs yet" (was "No song matches"), the player bar 0:00 / 0:00 (was -0:03, the stage's last time).
 
+## Done since: after a song, L
+`5029d94` L cycles what plays after each song: stop, the next song (wrapping round), this song again; the cards say
+which, and L on the end card plays on at once. `71613ef` the playback finds a song's end by a timer too, so it carries
+on in a hidden tab (checked by Manh in Comet).
+
+## Done since: the GPU, 21 → 14 ms a frame
+`a9c067a` All of Me at 3456×2234, M1 Pro. The depth of field's second draw of the score was never the cost (0.2 ms):
+the MSAA sat on the composer buffer the bloom blends into, not the one the scene is drawn in. Per pass now: scene 6.6
+(with its MSAA: the staff lines smooth), depth of field 3.6, comets ~0, bloom 2.2, output 0.4. 60 Hz holds; 120 Hz
+(8.3 ms) would cost quality: a cheaper depth-of-field blur (41 taps a pixel, in focus or not) or post at lower res.
+How to measure: GPU timer queries lie on ANGLE/Metal (the passes summed to 80 ms). Instead, a temporary dev-only
+`window.__stage` hook, the animation loop stopped, frames rendered by hand with a 1-pixel `readPixels` after each to
+wait for the GPU; a pass's own cost by running it 8 more times within the frame. Picture checked by screenshots
+paused at a fixed time (repeat shots match pixel for pixel).
+
 ## Next, in order
-1. **GPU work.** The depth-of-field pass renders the whole score (2.1 M vertices) a second time each frame. Measure
-   frame time on a long song before touching it.
-2. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
+1. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
 
 ## Skipped on purpose (YAGNI)
 More than two staves for orchestras (everything folds into piano staves); streaming the audio (risks the sync);
