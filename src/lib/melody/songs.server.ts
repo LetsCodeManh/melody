@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { access, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { error } from '@sveltejs/kit';
@@ -8,6 +9,8 @@ import type { Prepared } from './melody';
 /** The Blender project does the music work (MIDI, LilyPond engraving, flights, camera, audio); the page reuses it. */
 const ROOT = path.resolve('blender/melody-bounce');
 const SONGS = path.join(ROOT, 'songs');
+const BUILD = path.join(ROOT, 'build');
+const TRASH = path.join(os.homedir(), '.Trash'); // macOS: Finder's Put Back finds it there
 // a change to any of these changes what prepare.py writes
 const SOURCES = ['prepare.py', 'midi.py', 'score.py', 'flight.py', 'synth.py', 'settings.py'].map((f) => path.join(ROOT, f));
 const NAME = /^[\w-]+$/;
@@ -56,12 +59,17 @@ export async function addSong(file: string, bytes: Uint8Array): Promise<string> 
 const running = new Map<string, Promise<unknown>>();
 const modified = (file: string) => stat(file).then((s) => s.mtimeMs, () => -Infinity);
 
+/** The song's MIDI file; throws for a name that isn't a song in songs/. */
+async function songFile(song: string): Promise<string> {
+	if (!NAME.test(song) || !(await listSongs()).includes(song)) throw new RangeError(`no song "${song}"`);
+	return path.join(SONGS, song + '.mid');
+}
+
 /** The song's prepared data; prepares it first (~20 s) when it never was, or the MIDI or the code changed since.
  * Throws for a name that isn't a song in songs/. */
 export async function prepared(song: string): Promise<PreparedFiles> {
-	if (!NAME.test(song) || !(await listSongs()).includes(song)) throw new RangeError(`no song "${song}"`);
-	const midi = path.join(SONGS, song + '.mid');
-	const out = path.join(ROOT, 'build', song + '.json');
+	const midi = await songFile(song);
+	const out = path.join(BUILD, song + '.json');
 	const newest = Math.max(...(await Promise.all([midi, ...SOURCES].map(modified))));
 	if ((await modified(out)) < newest) {
 		// one run per song, however many requests ask while it runs
@@ -74,6 +82,30 @@ export async function prepared(song: string): Promise<PreparedFiles> {
 		await job;
 	}
 	return JSON.parse(await readFile(out, 'utf8'));
+}
+
+/** Moves the song's MIDI to the Trash, where it can be put back, and removes what was built from it (made again if it
+ * returns). Waits for a prepare still running, so it can't write the build back afterwards. Throws for a name that
+ * isn't a song in songs/. */
+export async function deleteSong(song: string): Promise<void> {
+	const midi = await songFile(song);
+	await running.get(song)?.catch(() => {});
+	await moveToTrash(midi, TRASH);
+	// names are letters, digits, _ and -, so the dot ends the song's name: all-of-me.* is never all-of-me-piano's
+	const built = (await readdir(BUILD).catch(() => [])).filter((f) => f.startsWith(song + '.'));
+	await Promise.all(built.map((f) => rm(path.join(BUILD, f), { recursive: true, force: true })));
+}
+
+/** Moves a file into the trash folder, under a dated name if one of its name is already there; returns where it went. */
+export async function moveToTrash(file: string, trash: string): Promise<string> {
+	await access(trash); // no Trash here: fail rather than delete outright
+	const { name, ext } = path.parse(file);
+	let to = path.join(trash, name + ext);
+	if (await access(to).then(() => true, () => false)) {
+		to = path.join(trash, `${name} ${new Date().toISOString().replace(/[:.]/g, '-')}${ext}`);
+	}
+	await rename(file, to);
+	return to;
 }
 
 /** prepared(), its failures as HTTP errors: 404 for an unknown song, 500 with prepare.py's last words. */

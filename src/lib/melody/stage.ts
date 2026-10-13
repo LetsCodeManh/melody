@@ -30,6 +30,8 @@ const INK_COLOUR = new THREE.Color(0.006, 0.006, 0.006);
 export interface Stage {
 	/** Shows a song: its score on the paper, its comets and heads. */
 	show(song: Prepared, svg: string): void;
+	/** Shows nothing: the song was taken away. */
+	clear(): void;
 	dispose(): void;
 }
 
@@ -129,6 +131,11 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			pulse = createPulse(next, looks);
 			scene.add(lights.paper);
 			overlay.add(lights.overlay);
+		},
+		clear() {
+			song = undefined; // the loop stops drawing, so black once
+			renderer.setRenderTarget(null);
+			renderer.clear();
 		},
 		dispose() {
 			renderer.setAnimationLoop(null);

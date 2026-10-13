@@ -16,6 +16,7 @@
 	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
 	const SKIP = 5; // s the arrow keys jump
 	const SLOW = 300; // ms a song may take to open before the loading card shows: a prepared one opens without a flash
+	const NO_SONGS = 'No songs yet: press A to add a .mid, or drop one on the page.';
 
 	let host: HTMLDivElement;
 	let stage: Stage | undefined;
@@ -46,8 +47,8 @@
 	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
 	const screen = $derived(preparing ? (slow ? 'loading' : undefined) : screenAt({ playing, t: now, run: span }));
 
-	async function fetchOk(url: string) {
-		const res = await fetch(url);
+	async function fetchOk(url: string, init?: RequestInit) {
+		const res = await fetch(url, init);
 		if (!res.ok) throw new Error((await res.json().catch(() => null))?.message ?? res.statusText);
 		return res;
 	}
@@ -134,6 +135,28 @@
 		}
 	}
 
+	/** Moves a song to the Trash; when it is the one playing, the next takes its place. */
+	async function deleteSong(name: string) {
+		try {
+			await fetchOk(`/api/melody/${encodeURIComponent(name)}`, { method: 'DELETE' });
+			const at = songs.indexOf(name);
+			songs = await (await fetchOk('/api/melody')).json();
+			say(`Moved ${name.replaceAll('-', ' ')} to the Trash`);
+			if (name !== song) return;
+			song = songs[Math.min(at, songs.length - 1)] ?? '';
+			if (song) return load(song);
+			loading++; // a load still on its way shows nothing
+			playback?.dispose();
+			playback = undefined;
+			setPreparing(false);
+			span = { start: 0, end: 0 };
+			stage?.clear();
+			error = NO_SONGS;
+		} catch (e) {
+			say(`${name}: ${(e as Error).message}`);
+		}
+	}
+
 	const dragsFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
 
 	function onDrop(e: DragEvent) {
@@ -201,7 +224,7 @@
 				const wanted = page.url.searchParams.get('song');
 				song = wanted && list.includes(wanted) ? wanted : list[0] ?? '';
 				if (song) load(song);
-				else error = 'No songs yet: put a .mid in blender/melody-bounce/songs.';
+				else error = NO_SONGS;
 			})
 			.catch((e: Error) => (error = `Songs: ${e.message}`));
 		return () => {
@@ -241,7 +264,7 @@
 		onSongs={() => (picking = true)}
 	/>
 
-	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={() => chooser.click()} />{/if}
+	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={() => chooser.click()} onDelete={deleteSong} />{/if}
 	<input
 		class="chooser"
 		type="file"

@@ -128,6 +128,16 @@
 		content: '[playing]';
 		font-size: inherit;
 	}
+	/* on the chosen row's light bar */
+	& .trash {
+		height: 100%;
+		border-radius: 0;
+		color: #000;
+	}
+	& .trash:hover {
+		background: #000;
+		color: #e8d9b0;
+	}
 	& .none {
 		padding: 1px 14px;
 	}
