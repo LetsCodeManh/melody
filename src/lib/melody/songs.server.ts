@@ -22,6 +22,12 @@ export interface PreparedFiles extends Prepared {
 	wav: string;
 }
 
+/** What the page gets of a prepared song: without the paths of the files on this machine. */
+export function forPage(data: Prepared): Prepared {
+	const { page, end, flights, held, ties, notes, camera, settings } = data;
+	return { page, end, flights, held, ties, notes, camera, settings };
+}
+
 export async function listSongs(): Promise<string[]> {
 	return (await readdir(SONGS)).filter((f) => f.endsWith('.mid')).map((f) => f.slice(0, -4)).sort();
 }
