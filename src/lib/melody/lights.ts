@@ -5,16 +5,18 @@ import { INK, type Prepared } from './melody';
 
 // The look of blender/melody-bounce/lights.py (lengths in staff spaces, times in s), live only: coloured by pitch,
 // sized by weight, tails by speed, heads cooling to embers
-export const COLOUR = new THREE.Color(1.0, 0.72, 0.42);
-const COMET_GLOW = 30;
-const COMET_WIDTH = 0.09; // bevel radius at the comet's head, for a note of middling weight
+const COMET_GLOW = 14;
+const COMET_WIDTH = 0.15; // bevel radius at the comet's head, for a note of middling weight
+// the hot white at a lit head's centre, and a touch of it in the comets
+const CORE = new THREE.Color(1.0, 0.9, 0.75);
+const CORE_SHARE = 0.25; // of a comet's colour
 const TAIL_TIME = 0.3; // s of flight the tail shows: a fast comet streaks, a slow one is a short spark
 const TAIL_SHARE = [0.2, 0.85]; // of the arc
 const DRAIN = 0.12; // for the tail to run into the head after landing
-const FLASH = 20; // for a note of middling weight
-const SUSTAIN = 3; // head glow at the hit, and after it settles
+const FLASH = 30; // for a note of middling weight
+const SUSTAIN = 4; // head glow at the hit, and after it settles
 const SETTLE = 0.35;
-const EMBER = 1.2; // what a lit head cools to, so the music just played stands out from what came before
+const EMBER = 2.5; // what a lit head cools to, so the music just played stands out from what came before
 const COOL = 4; // s for a head to cool most of the way from SUSTAIN to EMBER
 const RISE = 0.1; // for a held head (a tied note ringing on) to come up to SUSTAIN, with no flash
 const HEAD_RADII = [0.66, 0.47];
@@ -116,6 +118,7 @@ function cometMaterial({ settings }: Prepared, time: { value: number }) {
 			varying vec3 vColour;
 			const float TAIL_TIME = ${TAIL_TIME.toFixed(4)}, DRAIN = ${DRAIN.toFixed(4)};
 			const float WIDTH = ${COMET_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${COMET_GLOW.toFixed(4)};
+			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 
 			// thin at the tail, full near the head (lights.taper)
 			float taper(float s) { return s < 0.85 ? mix(0.05, 1.0, s / 0.85) : mix(1.0, 0.7, (s - 0.85) / 0.15); }
@@ -138,7 +141,7 @@ function cometMaterial({ settings }: Prepared, time: { value: number }) {
 				vec3 up = cross(side, tangent);
 				float radius = WIDTH * (0.7 + 0.6 * aLook.w) * taper(aRing.x) * shown;
 				vec3 p = centre + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
-				vColour = aLook.rgb * GLOW;
+				vColour = mix(aLook.rgb, CORE, ${CORE_SHARE.toFixed(4)}) * GLOW;
 				gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 			}`,
 		fragmentShader: /* glsl */ `
@@ -159,6 +162,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 	const position = new Float32Array(heads.length * per * 3);
 	const hit = new Float32Array(heads.length * per);
 	const struck = new Float32Array(heads.length * per);
+	const rim = new Float32Array(heads.length * per); // 0 at the centre vertex, 1 round the edge
 	const look = new Float32Array(heads.length * per * 4);
 	const index: number[] = [];
 	const [rx, ry] = HEAD_RADII;
@@ -173,6 +177,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 			index.push(first, first + 1 + i, first + 1 + ((i + 1) % HEAD_SEGMENTS));
 		}
 		hit.fill(land, first, first + per);
+		rim.fill(1, first + 1, first + per);
 		struck.fill(flash, first, first + per);
 		const { colour, weight } = looks[note];
 		for (let v = first; v < first + per; v++) look.set([colour.r, colour.g, colour.b, weight], v * 4);
@@ -181,6 +186,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 	g.setAttribute('position', new THREE.BufferAttribute(position, 3));
 	g.setAttribute('aHit', new THREE.BufferAttribute(hit, 1));
 	g.setAttribute('aStruck', new THREE.BufferAttribute(struck, 1));
+	g.setAttribute('aRim', new THREE.BufferAttribute(rim, 1));
 	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
 	g.setIndex(index);
 	return g;
@@ -190,11 +196,12 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 	return new THREE.ShaderMaterial({
 		uniforms: { uTime: time, uFrame: { value: 1 / settings.fps } },
 		vertexShader: /* glsl */ `
-			attribute float aHit, aStruck;
+			attribute float aHit, aStruck, aRim;
 			attribute vec4 aLook;
-			varying float vHit, vStruck;
+			varying float vHit, vStruck, vRim;
 			varying vec4 vLook;
 			void main() {
+				vRim = aRim;
 				vHit = aHit;
 				vStruck = aStruck;
 				vLook = aLook;
@@ -202,8 +209,9 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 			}`,
 		fragmentShader: /* glsl */ `
 			uniform float uTime, uFrame;
-			varying float vHit, vStruck;
+			varying float vHit, vStruck, vRim;
 			varying vec4 vLook;
+			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			const float FLASH = ${FLASH.toFixed(4)}, SUSTAIN = ${SUSTAIN.toFixed(4)}, SETTLE = ${SETTLE.toFixed(4)};
 			const float RISE = ${RISE.toFixed(4)}, EMBER = ${EMBER.toFixed(4)}, COOL = ${COOL.toFixed(4)};
 			void main() {
@@ -217,7 +225,8 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 					: t < 0.0 ? flash * (t + uFrame) / uFrame
 					: t < SETTLE ? mix(flash, SUSTAIN, t / SETTLE)
 					: steady;
-				gl_FragColor = vec4(vec3(0.01) + vLook.rgb * glow, 1.0);
+				// a white-hot spot in the middle, the note's colour all round it
+				gl_FragColor = vec4(vec3(0.01) + mix(CORE, vLook.rgb, smoothstep(0.0, 0.45, vRim)) * glow, 1.0);
 			}`
 	});
 }

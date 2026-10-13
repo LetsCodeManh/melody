@@ -1,16 +1,15 @@
 import * as THREE from 'three';
 
-const COLOUR = new THREE.Color(0.78, 0.75, 0.7);
-const TILE = 6; // staff spaces one tile of the grain covers
-const RELIEF = 0.35; // how steep the grain's bumps are
+const COLOUR = new THREE.Color(0.6, 0.6, 0.6);
+const TILE = 2.5; // staff spaces one tile of the grain covers
+const RELIEF = 0.15; // how steep the grain's bumps are
 const SIZE = 256; // texels a side
-// lattice cells across a tile, and how much each octave adds: blotches about a staff space wide, then finer tooth
+// lattice cells across a tile, and how much each octave adds: a fine tooth, only seen where light grazes it
 const OCTAVES = [
-	[6, 1],
-	[12, 0.55],
-	[24, 0.3],
-	[48, 0.16],
-	[96, 0.08]
+	[10, 0.35],
+	[20, 0.6],
+	[40, 0.5],
+	[80, 0.3]
 ];
 
 export interface Paper {
@@ -20,7 +19,7 @@ export interface Paper {
 	dispose(): void;
 }
 
-/** Heavy, toothy watercolour-like paper: a grain the lamp grazes and the lit heads pool light in. */
+/** Smooth grey paper with a fine tooth that shows where the lit heads' light grazes it. */
 export function createPaper(anisotropy: number): Paper {
 	const grain = grainTexture();
 	grain.anisotropy = anisotropy;

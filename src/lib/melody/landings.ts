@@ -15,7 +15,7 @@ const SPARK_GLOW = 14;
 const GRAVITY = 30;
 const DRAG = 4; // per s: sparks skid to a stop on the paper
 const GLOWS = 8; // lights pooling on the paper, at the freshest landings
-const GLOW_POWER = 50; // candela, for a note of middling weight
+const GLOW_POWER = 90; // candela, for a note of middling weight
 const GLOW_HEIGHT = 0.35; // over the print: how wide the pool spreads
 const GLOW_FADE = 2; // s for a pool to fade to a third, as newer landings take the lights
 
