@@ -12,6 +12,7 @@ def prepare(path):
     out = os.path.join(HERE, 'build', stem)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     song = midi.load(path)
+    score.check_written(song)
     staves = score.chords(song)
     mapped = score.write(song, out + '.ly')
     svg = score.engrave(out + '.ly')
@@ -47,4 +48,7 @@ def prepare(path):
 
 
 if __name__ == '__main__':
-    print(*prepare(sys.argv[1]))
+    try:
+        print(*prepare(sys.argv[1]))
+    except score.Unreadable as e:
+        sys.exit(str(e))  # the page shows stderr's last lines: the reason alone, no traceback

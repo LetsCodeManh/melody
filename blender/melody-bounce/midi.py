@@ -5,7 +5,7 @@ from collections import namedtuple
 import struct
 
 Note = namedtuple('Note', 'start end pitch velocity tick ticks', defaults=(0, 0))  # tick, ticks: start and length
-Song = namedtuple('Song', 'notes division time key')  # time: (beats, beat unit); key: sharps (+) or flats (-)
+Song = namedtuple('Song', 'notes division time key')  # time: (beats, beat unit); key: sharps (+) or flats (-), None if the file has none
 
 CHORD_WINDOW = 0.02  # seconds: onsets closer than this count as one chord
 DRUMS = 9            # General MIDI channel 10: percussion, which has no pitch to engrave
@@ -38,7 +38,7 @@ def parse_song(data):
         pos += 8 + size
     events.sort(key=lambda e: (e[0], e[1]))
     time = next(((a, b) for _, _, kind, a, b, _ in events if kind == 'time'), (4, 4))
-    key = next((a for _, _, kind, a, _, _ in events if kind == 'key'), 0)
+    key = next((a for _, _, kind, a, _, _ in events if kind == 'key'), None)
     return Song(_notes(events, division), division, time, key)
 
 

@@ -18,6 +18,43 @@ class ChordsTest(unittest.TestCase):
         treble, _ = score.chords(song((0, 8, 62), (0, 2, 69), (2, 2, 70), (8, 4, 62)))
         self.assertEqual([[c.pitches[0] for c in v] for v in score.voices(treble)], [[62, 62], [69, 70]])
 
+    def test_a_staff_needing_more_than_four_voices_prints_each_note_up_to_the_next_onset(self):
+        # a sequencer's sustain: chords a beat apart, each held for four and a quarter beats
+        held = song(*((t, 17, p) for t in range(0, 40, 4) for p in (65, 69)), (0, 9, 48))
+        treble, bass = score.chords(held)
+        self.assertEqual({c.length for c in treble[:-1]}, {4})
+        self.assertEqual((treble[-1].length, len(score.voices(treble))), (17, 1))  # nothing after the last to stop it
+        self.assertEqual([c.length for c in bass], [9])  # alone on its staff, it keeps its length
+
+    def test_four_voices_are_left_as_written(self):
+        treble, _ = score.chords(song((0, 16, 60), (0, 12, 64), (0, 8, 67), (0, 4, 72), (4, 4, 74)))
+        self.assertEqual(sorted(c.length for c in treble), [4, 4, 8, 12, 16])
+
+
+class CheckWrittenTest(unittest.TestCase):
+    def test_refuses_a_recording_of_someone_playing(self):
+        played = Song([Note(i / 8, i / 8 + 1, 60, 80, i * 7 + i % 5, 9) for i in range(40)], 32, (4, 4), None)
+        with self.assertRaisesRegex(score.Unreadable, 'recorded from someone playing'):
+            score.check_written(played)
+
+    def test_lets_a_written_piece_played_a_little_early_through(self):
+        early = Song([Note(i / 8, i / 8 + 1, 60, 80, 32 * i - (6 if i % 3 else 0), 32) for i in range(40)], 128, (4, 4), None)
+        score.check_written(early)
+
+    def test_refuses_a_file_without_notes(self):
+        with self.assertRaisesRegex(score.Unreadable, 'no notes'):
+            score.check_written(Song([], 480, (4, 4), None))
+
+
+class SignatureTest(unittest.TestCase):
+    def test_keeps_the_files_own_key(self):
+        self.assertEqual(score.signature(song((0, 4, 66), key=-2)), -2)
+
+    def test_without_one_picks_the_signature_needing_fewest_accidentals(self):
+        e_flat = song(*((i, 1, p) for i, p in enumerate((63, 65, 67, 68, 70, 72, 74, 63, 67, 70))), key=None)
+        self.assertEqual(score.signature(e_flat), -3)
+        self.assertEqual(score.signature(song((0, 4, 60), (4, 4, 65), (8, 4, 69), key=None)), 0)  # C or F: fewer flats
+
 
 class SpellingTest(unittest.TestCase):
     def test_pitch_names_follow_the_key(self):

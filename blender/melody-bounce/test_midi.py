@@ -37,6 +37,10 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((song.time, song.key, song.division), ((3, 4), -2, 480))
         self.assertEqual((song.notes[0].tick, song.notes[0].ticks), (0, 240))
 
+    def test_a_file_without_a_key_signature_says_so(self):
+        song = midi.parse_song(smf(track(b'\x00\x90\x3c\x64', b'\x83\x60\x80\x3c\x00')))
+        self.assertEqual((song.time, song.key), ((4, 4), None))
+
     def test_skips_the_drum_channel(self):
         notes = midi.parse(smf(track(b'\x00\x99\x24\x64', b'\x00\x90\x3c\x64', b'\x83\x60\x89\x24\x00',
                                      b'\x00\x80\x3c\x00')))
