@@ -1,4 +1,4 @@
-# Checks a built Bounce scene: every comet in the air and glint along a tie (and each landing spot) is inside the
+# Checks a built Bounce scene: every comet in the air and ball rolling along a tie (and each landing spot) is inside the
 # camera's frame, and the camera moves smoothly; fails if one leaves the frame. Run after build.py in the same Blender:
 #   exec(open('/Users/manh/Developer/personal-os/visual/blender/melody-bounce/check.py').read())
 import bpy, json, sys

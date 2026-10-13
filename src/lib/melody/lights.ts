@@ -20,15 +20,16 @@ const EMBER = 2.5; // what a lit head cools to, so the music just played stands 
 const COOL = 4; // s for a head to cool most of the way from SUSTAIN to EMBER
 const DARK = 8; // s for the ember to fade back to ink once it has cooled, as a light losing its power
 const FILL = 0.15; // for a held head (a tied note ringing on) to fill up to SUSTAIN once reached, with no flash
-const GLIDE_GLOW = 6; // the glint gliding along a tie: dimmer and thinner than a comet, flat on the ink
-const GLIDE_WIDTH = 0.06;
-const GLINT = 0.25; // share of the tie the glint covers
+const TRAIL_GLOW = 6; // the tie lit behind its ball: dimmer and thinner than a comet, flat on the ink
+const TRAIL_WIDTH = 0.06;
+const BALL = 0.15; // radius of the ball rolling along a tie, for a note of middling weight
 const HEAD_RADII = [0.66, 0.47];
 const HEAD_TILT = THREE.MathUtils.degToRad(20);
 
 const RINGS = 24; // along each comet's visible stretch
 const SIDES = 6;
 const HEAD_SEGMENTS = 24;
+const BALL_SEGMENTS = 12; // round the ball, half as many from pole to pole
 
 export interface Lights {
 	/** On the paper, with it in the depth of field: the heads and the ripples. */
@@ -49,13 +50,14 @@ export function createLights(song: Prepared, looks: Look[]): Lights {
 	const time = { value: -Infinity };
 	const comets = new THREE.Mesh(cometGeometry(song, looks), cometMaterial(song, time));
 	const heads = new THREE.Mesh(headGeometry(song, looks), headMaterial(song, time));
-	const glints = new THREE.Mesh(glintGeometry(song, looks), glintMaterial(time));
+	const trails = new THREE.Mesh(trailGeometry(song, looks), trailMaterial(time));
+	const balls = new THREE.Mesh(ballGeometry(song, looks), ballMaterial(time));
 	// their vertices move in the shaders, so their bounds mean nothing
-	comets.frustumCulled = heads.frustumCulled = glints.frustumCulled = false;
+	comets.frustumCulled = heads.frustumCulled = trails.frustumCulled = balls.frustumCulled = false;
 	const landings = createLandings(song, looks, time);
 	const [paper, overlay] = [new THREE.Group(), new THREE.Group()];
 	paper.add(heads, landings.ripples, landings.glows);
-	overlay.add(comets, glints, landings.sparks);
+	overlay.add(comets, trails, balls, landings.sparks);
 	return {
 		paper,
 		overlay,
@@ -65,7 +67,7 @@ export function createLights(song: Prepared, looks: Look[]): Lights {
 		},
 		setViewHeight: landings.setViewHeight,
 		dispose() {
-			for (const m of [comets, heads, glints, landings.ripples, landings.sparks]) {
+			for (const m of [comets, heads, trails, balls, landings.ripples, landings.sparks]) {
 				m.geometry.dispose();
 				(m.material as THREE.Material).dispose();
 			}
@@ -178,10 +180,10 @@ const COOLING = /* glsl */ `
 		return glow * (1.0 - smoothstep(SETTLE + COOL, SETTLE + COOL + DARK, t));
 	}`;
 
-/** Each glint: a short comet lying on its tie, RINGS rings of SIDES vertices like the comets'; the shader places them
- * on the tie's curve for the current time. It sets off as the music reaches the tied note's earlier head and reaches
- * the later one as the music does, then runs into it. */
-function glintGeometry({ ties }: Prepared, looks: Look[]) {
+/** Each tie's trail: a thin tube of RINGS rings of SIDES vertices like the comets'; the shader places them on the
+ * tie's curve for the current time. It lights the tie from its first head up to the ball, and stays lit once the ball
+ * is in, fading with the head it reached. */
+function trailGeometry({ ties }: Prepared, looks: Look[]) {
 	const per = RINGS * SIDES;
 	const from = new Float32Array(ties.length * per * 4);
 	const to = new Float32Array(ties.length * per * 4);
@@ -216,7 +218,7 @@ function glintGeometry({ ties }: Prepared, looks: Look[]) {
 	return g;
 }
 
-function glintMaterial(time: { value: number }) {
+function trailMaterial(time: { value: number }) {
 	return new THREE.ShaderMaterial({
 		uniforms: { uTime: time },
 		vertexShader: /* glsl */ `
@@ -224,28 +226,96 @@ function glintMaterial(time: { value: number }) {
 			attribute vec4 aFrom;   // the tie's first two Bezier points
 			attribute vec4 aTo;     // its last two
 			attribute vec2 aTimes;  // start, end
-			attribute vec2 aRing;   // place along the visible stretch, angle around it
+			attribute vec2 aRing;   // place along the lit stretch, angle around it
 			attribute vec4 aLook;   // colour, weight
 			varying vec3 vColour;
-			const float GLINT = ${GLINT.toFixed(4)}, DRAIN = ${DRAIN.toFixed(4)};
-			const float WIDTH = ${GLIDE_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${GLIDE_GLOW.toFixed(4)};
+			const float SUSTAIN = ${SUSTAIN.toFixed(4)};
+			const float WIDTH = ${TRAIL_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${TRAIL_GLOW.toFixed(4)};
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
-			${TAPER}
+			${TIE}
+			${COOLING}
+
+			void main() {
+				float start = aTimes.x, end = aTimes.y;
+				// lit from the tie's start up to the ball; once it is in, fading as the head it reached cools
+				float reach = clamp((uTime - start) / (end - start), 0.0, 1.0);
+				float fade = uTime < end ? 1.0 : cooling(uTime - end) / SUSTAIN;
+				float shown = step(start, uTime) * step(1e-4, reach) * step(1e-3, fade);
+				float u = reach * aRing.x;
+				vec3 tangent = normalize(vec3(slope(aFrom, aTo, u), 0.0) + vec3(1e-6, 0.0, 0.0));
+				vec3 side = normalize(cross(tangent, vec3(0.0, 0.0, 1.0)));
+				vec3 up = cross(side, tangent);
+				float radius = WIDTH * (0.7 + 0.6 * aLook.w) * shown;
+				vec3 p = vec3(bezier(aFrom, aTo, u), LIFT) + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
+				vColour = mix(aLook.rgb, CORE, ${CORE_SHARE.toFixed(4)}) * GLOW * fade;
+				gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+			}`,
+		fragmentShader: /* glsl */ `
+			varying vec3 vColour;
+			void main() { gl_FragColor = vec4(vColour, 1.0); }`,
+		depthTest: false
+	});
+}
+
+/** Each tie's ball: a small sphere the shader rolls along the tie, setting off as the music reaches the tied note's
+ * earlier head and reaching the later one as the music does, then sinking into it. */
+function ballGeometry({ ties }: Prepared, looks: Look[]) {
+	const sphere = new THREE.SphereGeometry(1, BALL_SEGMENTS, BALL_SEGMENTS / 2);
+	const unit = sphere.getAttribute('position').array;
+	const unitIndex = sphere.getIndex()!.array;
+	const per = unit.length / 3;
+	const position = new Float32Array(ties.length * per * 3);
+	const from = new Float32Array(ties.length * per * 4);
+	const to = new Float32Array(ties.length * per * 4);
+	const times = new Float32Array(ties.length * per * 2);
+	const look = new Float32Array(ties.length * per * 4);
+	const index: number[] = [];
+	ties.forEach(([note, start, end, x0, y0, x1, y1, x2, y2, x3, y3], f) => {
+		const { colour, weight } = looks[note];
+		position.set(unit, f * per * 3);
+		for (let v = f * per; v < (f + 1) * per; v++) {
+			from.set([x0, y0, x1, y1], v * 4);
+			to.set([x2, y2, x3, y3], v * 4);
+			times.set([start, end], v * 2);
+			look.set([colour.r, colour.g, colour.b, weight], v * 4);
+		}
+		for (const i of unitIndex) index.push(f * per + i);
+	});
+	sphere.dispose();
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.BufferAttribute(position, 3)); // round the ball's centre, radius 1
+	g.setAttribute('aFrom', new THREE.BufferAttribute(from, 4));
+	g.setAttribute('aTo', new THREE.BufferAttribute(to, 4));
+	g.setAttribute('aTimes', new THREE.BufferAttribute(times, 2));
+	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
+	g.setIndex(index);
+	return g;
+}
+
+function ballMaterial(time: { value: number }) {
+	return new THREE.ShaderMaterial({
+		uniforms: { uTime: time },
+		vertexShader: /* glsl */ `
+			uniform float uTime;
+			attribute vec4 aFrom, aTo; // the tie's Bezier points
+			attribute vec2 aTimes;     // start, end
+			attribute vec4 aLook;      // colour, weight
+			varying vec3 vColour;
+			const float DRAIN = ${DRAIN.toFixed(4)};
+			const float SIZE = ${BALL.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${COMET_GLOW.toFixed(4)};
+			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			${TIE}
 
 			void main() {
 				float start = aTimes.x, end = aTimes.y;
-				// the visible stretch of the tie, as the comets': GLINT of it behind the glint, draining at the end
-				float head = clamp((uTime - start) / (end - start), 0.0, 1.0);
-				float tail = uTime < end ? max(head - GLINT, 0.0) : mix(1.0 - GLINT, 1.0, clamp((uTime - end) / DRAIN, 0.0, 1.0));
-				float shown = step(start, uTime) * step(tail + 1e-4, head);
-				float u = mix(tail, head, aRing.x);
-				vec3 tangent = normalize(vec3(slope(aFrom, aTo, u), 0.0) + vec3(1e-6, 0.0, 0.0));
-				vec3 side = normalize(cross(tangent, vec3(0.0, 0.0, 1.0)));
-				vec3 up = cross(side, tangent);
-				float radius = WIDTH * (0.7 + 0.6 * aLook.w) * taper(aRing.x) * shown;
-				vec3 p = vec3(bezier(aFrom, aTo, u), LIFT) + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
-				vColour = mix(aLook.rgb, CORE, ${CORE_SHARE.toFixed(4)}) * GLOW;
+				float u = clamp((uTime - start) / (end - start), 0.0, 1.0);
+				// sinks into the head it reached as the head fills
+				float size = step(start, uTime) * (1.0 - clamp((uTime - end) / DRAIN, 0.0, 1.0));
+				vec3 centre = vec3(bezier(aFrom, aTo, u), LIFT);
+				vec3 p = centre + position * SIZE * (0.7 + 0.6 * aLook.w) * size;
+				// white-hot where it faces the camera, the note's colour round its rim
+				float facing = abs(dot(position, normalize(cameraPosition - centre)));
+				vColour = mix(aLook.rgb, CORE, facing * facing) * GLOW;
 				gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 			}`,
 		fragmentShader: /* glsl */ `
@@ -326,7 +396,7 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 			void main() {
 				// the glow keys in lights.py, then cooling. Struck: dark until a frame before the hit, a flash as heavy
 				// as the note, settling to a steady glow. Held: once the music reaches it, filling with the steady glow
-				// from its left, the side its tie comes in, as the glint gliding along runs into it. Both then cool to
+				// from its left, the side its tie comes in, as the ball rolling along sinks into it. Both then cool to
 				// an ember and fade back to ink.
 				float t = uTime - vHit;
 				float flash = FLASH * (0.5 + vLook.w);

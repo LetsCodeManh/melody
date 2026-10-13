@@ -89,9 +89,15 @@ a real drag from Finder not tried.
 - `193bd80` a note split at a barline was struck on whichever of its heads LilyPond printed first, sometimes the second
   (5 notes in All of Me): now always the leftmost.
 
+## Done since: a ball rolls along the tie, lighting it
+The glint is now a ball rolling along the tie (white-hot where it faces the camera, the note's colour round its rim)
+with the tie lit behind it from its first head. Once the ball sinks into the held head, the lit tie stays and fades with
+that head (live: cools to an ember and goes dark; Blender: stays lit, as its heads do). Tuning: `TRAIL_GLOW`,
+`TRAIL_WIDTH`, `BALL` in `lights.ts` and `lights.py`. Looked at by eye: live (headless Chrome, paused at fixed times)
+and Blender stills of All of Me; `check.py` 0 out of frame. Manh has not seen the ball on the page yet.
+
 ## Next, in order
-1. **Look:** a Blender render of a glint (only the live page has been looked at), and the low-note framing on the page
-   (Nocturne, from "every comet in frame" above).
+1. **Look:** the low-note framing on the page (Nocturne, from "every comet in frame" above).
 2. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
 
 ## Skipped on purpose (YAGNI)
@@ -108,4 +114,6 @@ meter changes mid-song, odd meters (5/4, 7/8) found from the notes, triplets and
   `for f in blender/melody-bounce/build/*.json; do /Applications/Blender.app/Contents/MacOS/Blender -b
   --python-exit-code 1 --addons io_curve_svg --python blender/melody-bounce/build.py --python
   blender/melody-bounce/check.py -- $f 2>&1 | grep -E "comet points|leave the frame"; done`
+- Pausing the page at a fixed time for screenshots: a temporary dev-only `window.__seek = seek` in `+page.svelte`
+  (guard it with `typeof window !== 'undefined'`, or SSR answers 500), then playwright-core with `channel: 'chrome'`.
 - Songs are private: `songs/` stays untracked; downloads go into a fresh `mktemp -d`, read with `python3 -I`.

@@ -1,7 +1,8 @@
 # The lights: a comet per note that flies along its arc and lands on the note's head, and the head lighting up and
-# staying lit; a tied note ringing on, a glint gliding along its tie to the head it is held on to. Each comet and glint
-# is a curve whose visible stretch (bevel start/end) is keyframed, so no handlers are needed.
-import bpy, math
+# staying lit; a tied note ringing on, a ball rolling along its tie to the head it is held on to, lighting the tie
+# behind it. Each comet and lit tie is a curve whose visible stretch (bevel start/end) is keyframed, and each ball's
+# path is keyframed, so no handlers are needed.
+import bpy, bmesh, math
 import flight
 
 COMET_COLOUR = (1.0, 0.72, 0.42, 1)
@@ -13,9 +14,9 @@ POINTS = 32             # per arc
 FLASH, SUSTAIN = 20.0, 3.0  # head glow at the hit, and after it settles
 SETTLE = 0.35           # s
 FILL = 0.15             # s for a held head (a tied note ringing on) to come up to SUSTAIN once reached, with no flash
-GLIDE_GLOW = 8.0
-GLIDE_WIDTH = 0.05      # staff spaces
-GLINT = 0.25            # share of the tie the glint covers
+TRAIL_GLOW = 8.0        # the tie lit behind its ball; stays lit, as the heads do here
+TRAIL_WIDTH = 0.05      # staff spaces
+BALL = 0.09             # staff spaces: radius of the ball rolling along a tie
 HEAD_RADII = (0.66, 0.47)   # staff spaces: a black notehead
 HEAD_TILT = math.radians(20)
 
@@ -116,23 +117,39 @@ def build(col, flights, held, glides, space, lift, frame, bake):
         head['glow'] = 0.0
         bake(head, '["glow"]', 0, [frame(t), frame(t + FILL)], [0.0, SUSTAIN])
 
-    glint = emission_material('Glint', COMET_COLOUR, GLIDE_GLOW)
+    trail = emission_material('Trail', COMET_COLOUR, TRAIL_GLOW)
+    ball_mesh = bpy.data.meshes.new('Ball')
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=6, radius=BALL * space)
+    bm.to_mesh(ball_mesh)
+    bm.free()
+    ball_mesh.materials.append(comet)
     for i, g in enumerate(glides):
-        cu = bpy.data.curves.new(f'Glint.{i:03d}', 'CURVE')
+        cu = bpy.data.curves.new(f'Trail.{i:03d}', 'CURVE')
         cu.dimensions = '3D'
-        cu.bevel_depth, cu.bevel_resolution = GLIDE_WIDTH * space, 2
-        cu.taper_object, cu.use_map_taper = taper_ob, True
-        cu.bevel_factor_mapping_start = cu.bevel_factor_mapping_end = 'SPLINE'
+        cu.bevel_depth, cu.bevel_resolution = TRAIL_WIDTH * space, 2
+        cu.bevel_factor_mapping_end = 'SPLINE'
         sp = cu.splines.new('POLY')
         sp.points.add(POINTS - 1)
         for k, p in enumerate(sp.points):
             px, py = flight.bezier(g.curve, k / (POINTS - 1))
             p.co = (px * space, py * space, lift + 0.0002, 1)
-        cu.materials.append(glint)
+        cu.materials.append(trail)
         ob = bpy.data.objects.new(cu.name, cu)
         col.objects.link(ob)
         start, end = frame(g.start), frame(g.end)
-        drained = end + DRAIN * (frame(1) - frame(0))
-        # the glint keeps GLINT of the tie behind it: it sets off from nothing, and runs into the head at the end
+        # lit from the tie's start up to the ball, and staying lit
         bake(cu, 'bevel_factor_end', 0, [start, end], [0.0, 1.0])
-        bake(cu, 'bevel_factor_start', 0, [start, start + GLINT * (end - start), end, drained], [0.0, 0.0, 1 - GLINT, 1.0])
+
+        ball = bpy.data.objects.new(f'Ball.{i:03d}', ball_mesh)
+        col.objects.link(ball)
+        steps = max(int(end - start), 1)
+        frames = [start + (end - start) * k / steps for k in range(steps + 1)]
+        path = [flight.bezier(g.curve, k / steps) for k in range(steps + 1)]
+        bake(ball, 'location', 0, frames, [x * space for x, _ in path])
+        bake(ball, 'location', 1, frames, [y * space for _, y in path])
+        ball.location.z = lift + 0.0002
+        # rolls from the earlier head to the later as the music does, then sinks into it as it fills
+        drained = end + DRAIN * (frame(1) - frame(0))
+        for axis in range(3):
+            bake(ball, 'scale', axis, [start - 1, start, end, drained], [0.0, 1.0, 1.0, 0.0])
