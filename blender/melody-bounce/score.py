@@ -173,8 +173,9 @@ class Source:
             self.add(line.rstrip() + '>' + length + ('~' if k < len(parts) - 1 else ''))
 
 
-def write(song, path):
-    """The LilyPond source for the song, written to path; returns the Source with its heads and held maps."""
+def write(song, path, paged=False):
+    """The LilyPond source for the song, written to path; returns the Source with its heads and held maps. paged: broken
+    into pages as an edition is, to check against one; otherwise one long line, as the page and Blender show it."""
     beats, unit, pickup = meter.find(song, GRID)
     key = signature(song)
     bar = beats * GRID * 4 // unit
@@ -184,7 +185,8 @@ def write(song, path):
     src = Source()
     src.add('\\version "2.24.0"')
     src.add('\\header { tagline = ##f }')
-    src.add('\\paper { page-breaking = #ly:one-line-breaking indent = 0 }')
+    if not paged:
+        src.add('\\paper { page-breaking = #ly:one-line-breaking indent = 0 }')
     # ledger lines as thin as the staff lines, and marked so engrave() can redraw them as staff lines
     src.add('\\layout { \\context { \\Staff \\override StaffSymbol.ledger-line-thickness = #\'(1 . 0) '
             f'\\override LedgerLineSpanner.color = #(rgb-color {LEDGER_MARK}) }} '
