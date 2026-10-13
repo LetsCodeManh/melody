@@ -10,9 +10,22 @@ def song(*notes, key=-2):
 
 class ChordsTest(unittest.TestCase):
     def test_splits_hands_at_middle_c_then_groups_chords(self):
-        treble, bass = score.chords(song((0, 2, 67), (0, 2, 57), (0, 2, 70), (0, 4, 62)))
-        self.assertEqual([(c.start, c.length, c.pitches) for c in treble], [(0, 2, [67, 70]), (0, 4, [62])])
+        treble, bass = score.chords(song((0, 2, 67), (0, 2, 57), (0, 2, 70), (0, 4, 64)))
+        self.assertEqual([(c.start, c.length, c.pitches) for c in treble], [(0, 2, [67, 70]), (0, 4, [64])])
         self.assertEqual([(c.pitches, c.notes) for c in bass], [([57], [1])])
+
+    def test_middle_c_goes_with_the_left_hand_chord_it_is_struck_in(self):
+        # A3 and C4 struck together under a held tune, as Saria's Song's accompaniment
+        treble, bass = score.chords(song((0, 8, 71), (0, 1, 57), (0, 1, 60), (1, 1, 57), (1, 1, 60)))
+        self.assertEqual([c.pitches for c in treble], [[71]])
+        self.assertEqual([c.pitches for c in bass], [[57, 60], [57, 60]])
+
+    def test_middle_c_stays_up_as_the_tune_alone_or_out_of_reach(self):
+        _, bass = score.chords(song((0, 2, 57), (0, 2, 60),     # nothing above it: the tune
+                                    (2, 2, 48), (2, 2, 60), (2, 2, 67),  # an octave over the bass note
+                                    (4, 2, 60), (4, 2, 67),               # no bass note struck with it
+                                    (6, 2, 57), (6, 2, 64), (6, 2, 72)))  # E4 stays on the treble staff
+        self.assertEqual([c.pitches for c in bass], [[57], [48], [57]])
 
     def test_overlapping_chords_get_their_own_voice(self):
         treble, _ = score.chords(song((0, 8, 62), (0, 2, 69), (2, 2, 70), (8, 4, 62)))

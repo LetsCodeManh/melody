@@ -2,13 +2,16 @@
 # write() makes the LilyPond source and remembers the line:column of every pitch it writes; LilyPond's point-and-click
 # links on the SVG's noteheads point back to those positions, which is how a head is matched to its note.
 from collections import Counter, namedtuple
-import os, re, subprocess
+import bisect, os, re, subprocess
 
 Chord = namedtuple('Chord', 'start length pitches notes')  # start, length in grid steps; notes: indices into song.notes
 Head = namedtuple('Head', 'note x y')                       # centre of the head; SVG units (staff spaces), y down
 
 GRID = 4            # steps per quarter note: sixteenths
 SPLIT = 60          # middle C: lower notes go to the bass staff
+# middle C and D sit a ledger line from either staff, so they are printed with the hand that plays them: the left
+# when struck with a bass-staff note at most a fourth below and under a higher note (the tune)
+BETWEEN, REACH = range(SPLIT, 63), 5
 # a note starting more than a quarter step off the grid was played, not written; with no grid at all half of them are,
 # a written piece with a human feel a fifth
 OFF_GRID, PLAYED = 0.25, 0.35
@@ -54,16 +57,29 @@ def signature(song):
 
 
 def chords(song):
-    """Notes below middle C go to the bass staff; within a staff, notes sharing an onset and a length become one
-    chord. Returns (treble, bass), each sorted by start."""
+    """Notes below middle C go to the bass staff, with the middle C and D the left hand plays; within a staff, notes
+    sharing an onset and a length become one chord. Returns (treble, bass), each sorted by start."""
     step = song.division / GRID
-    placed = [(n.pitch < SPLIT, round(n.tick / step), max(1, round(n.ticks / step))) for n in song.notes]
+    spans = [(round(n.tick / step), max(1, round(n.ticks / step)), n.pitch) for n in song.notes]
+    placed = [(bass, start, length) for bass, (start, length, _) in zip(_in_bass(spans), spans)]
     staves = _grouped(song, placed)
     if max(len(voices(staff)) for staff in staves) > MAX_VOICES:
         # notes held on past the ones after them, as a sequencer's sustain: each prints only up to the next onset on
         # its staff (the sound keeps their full length)
         staves = _grouped(song, _held_to_next(placed))
     return staves
+
+
+def _in_bass(spans):
+    """For each (start, length, pitch): whether it goes to the bass staff."""
+    onsets = sorted({start for start, _, _ in spans})
+    lowest, highest = {}, {}  # struck at each onset; sounding at each onset
+    for start, length, pitch in spans:
+        lowest[start] = min(lowest.get(start, pitch), pitch)
+        for t in onsets[bisect.bisect_left(onsets, start):bisect.bisect_left(onsets, start + length)]:
+            highest[t] = max(highest.get(t, pitch), pitch)
+    return [pitch < SPLIT or (pitch in BETWEEN and pitch - REACH <= lowest[start] < SPLIT and highest[start] > pitch)
+            for start, _, pitch in spans]
 
 
 def _held_to_next(placed):
