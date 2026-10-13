@@ -12,6 +12,6 @@ describe('library', () => {
 		const songs = library(false);
 		expect(songs.editable).toBe(false);
 		expect(songs.list).toBe('/songs/index.json');
-		expect(songs.files('bach')).toEqual({ data: '/songs/bach/song.json', score: '/songs/bach/score.svg', audio: '/songs/bach/audio.wav' });
+		expect(songs.files('bach')).toEqual({ data: '/songs/bach/song.json', score: '/songs/bach/score.svg', audio: '/songs/bach/audio.flac' });
 	});
 });

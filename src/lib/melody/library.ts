@@ -11,7 +11,7 @@ export function library(live: boolean) {
 		/** a song's data (Prepared), engraved score and audio */
 		files(song: string) {
 			const base = `${at}/${encodeURIComponent(song)}`;
-			return { data: live ? base : `${base}/song.json`, score: `${base}/score.svg`, audio: `${base}/audio.wav` };
+			return { data: live ? base : `${base}/song.json`, score: `${base}/score.svg`, audio: `${base}/audio.${live ? 'wav' : 'flac'}` };
 		}
 	};
 }

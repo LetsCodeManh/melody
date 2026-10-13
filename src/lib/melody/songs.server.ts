@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { access, copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -129,7 +129,8 @@ export async function preparedForRequest(song: string): Promise<PreparedFiles> {
 }
 
 /** Copies a song, prepared first when it needs to be, to where the deployed site finds it: <to>/<song>/song.json (what
- * the page gets), score.svg and audio.wav. Then lists it in <to>/index.json. Throws for a name that isn't a song. */
+ * the page gets), score.svg and audio.flac (needs ffmpeg). Then lists it in <to>/index.json. Throws for a name that
+ * isn't a song. */
 export async function publishSong(song: string, to = PUBLISHED): Promise<void> {
 	const data = await prepared(song);
 	const dir = path.join(to, song);
@@ -138,7 +139,8 @@ export async function publishSong(song: string, to = PUBLISHED): Promise<void> {
 		writeFile(path.join(dir, 'song.json'), JSON.stringify(forPage(data))),
 		// without LilyPond's point-and-click links: they draw nothing, and each holds this machine's path to the song
 		readFile(data.score, 'utf8').then((svg) => writeFile(path.join(dir, 'score.svg'), svg.replace(/<a [^>]*>|<\/a>/g, ''))),
-		copyFile(data.wav, path.join(dir, 'audio.wav'))
+		// FLAC: the same sound as the WAV at a fifth of the download
+		promisify(execFile)('ffmpeg', ['-y', '-loglevel', 'error', '-i', data.wav, '-c:a', 'flac', '-compression_level', '12', path.join(dir, 'audio.flac')])
 	]);
 	await writePublishedList(to);
 }
