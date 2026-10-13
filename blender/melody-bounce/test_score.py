@@ -87,6 +87,22 @@ class SpellingTest(unittest.TestCase):
         self.assertEqual(score.lengths(40), ['1.', '1'])
 
 
+class PrintedTest(unittest.TestCase):
+    def test_a_note_split_at_a_barline_is_struck_on_its_leftmost_head_whatever_order_they_are_printed_in(self):
+        # LilyPond links both heads of a note it splits at a barline to the same place, and may print the later first
+        head = '<a xlink:href="textedit:///s.ly:{}:3:4"><g transform="translate({}, 2.0)"><path d=""/></g></a>'
+        source = score.Source()
+        source.heads, source.held = {(5, 3): 0}, {(6, 3): 0}
+        with tempfile.TemporaryDirectory() as folder:
+            svg = os.path.join(folder, 's.svg')
+            with open(svg, 'w') as f:
+                f.write(head.format(5, 20.0) + head.format(5, 10.0) + head.format(6, 30.0))
+            struck = score.noteheads(svg, source)
+            held = score.held_heads(svg, source)
+        self.assertEqual([h.x for h in struck], [10.0 + score.HEAD_HALF])
+        self.assertEqual([h.x for h in held], [20.0 + score.HEAD_HALF, 30.0 + score.HEAD_HALF])
+
+
 @unittest.skipUnless(shutil.which('lilypond'), 'needs LilyPond')
 class EngraveTest(unittest.TestCase):
     def test_every_note_gets_a_head_at_its_place(self):

@@ -207,13 +207,16 @@ TRANSLATE = re.compile(r'translate\(\s*([-\d.]+)[ ,]+([-\d.]+)\s*\)')
 
 
 def _printed(svg):
-    """Every linked glyph LilyPond printed: ((line, column) it came from, x, y)."""
+    """Every linked glyph LilyPond printed: ((line, column) it came from, x, y), left to right. The score is one line,
+    so that is the order they are played in; the SVG's own order is not (the heads of a note split at a barline)."""
     with open(svg) as f:
         text = f.read()
+    out = []
     for m in LINK.finditer(text):
         t = TRANSLATE.search(text, m.end(), m.end() + 400)
         if t:
-            yield (int(m.group(1)), int(m.group(2))), float(t.group(1)) + HEAD_HALF, float(t.group(2))
+            out.append(((int(m.group(1)), int(m.group(2))), float(t.group(1)) + HEAD_HALF, float(t.group(2))))
+    return sorted(out, key=lambda p: p[1])
 
 
 def noteheads(svg, source):
