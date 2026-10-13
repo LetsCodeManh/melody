@@ -17,8 +17,9 @@ pnpm dev
 Open the page, drop a `.mid` file on it (or put one in `blender/melody-bounce/songs/`) and pick it. The first play
 engraves it and plans the flights (~20 s); after that it starts at once. Solo piano arrangements work best.
 
-Songs aren't included: most are under copyright. [Mutopia](https://www.mutopiaproject.org) has free, public-domain
-piano MIDIs.
+One song ships as a demo: Bach's Prelude No. 1 in C (BWV 846), public domain, from the
+[Mutopia Project](https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=5). Your own MIDIs stay out of git: most songs
+are under copyright. Mutopia has many more free piano pieces.
 
 ## Video
 Rendering a video also needs [Blender](https://www.blender.org) and ffmpeg:

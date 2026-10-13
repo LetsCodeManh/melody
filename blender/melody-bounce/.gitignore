@@ -1,6 +1,6 @@
 build/
 renders/
 __pycache__/
-# your MIDI files stay out of the repo: most songs are under copyright
+# your MIDI files stay out of the repo (most songs are under copyright); only the public-domain demo ships
 songs/*
-!songs/.gitkeep
+!songs/bach-prelude-in-c.mid
