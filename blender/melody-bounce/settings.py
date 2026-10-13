@@ -8,6 +8,7 @@ SAMPLES = 16                # EEVEE samples per frame: looks the same as 64 here
 LEAD, TAIL = 1.0, 2.0       # s before the first note and after the last
 SPACE = 0.05                # metres per staff space: a 1-minute score is ~30 m long
 INK = 0.0015                # m: how far the print stands off the paper
+STAFF_LINES = 0.5           # of INK: the notes stand over the staff lines they cross, as ink printed on them
 STAFF_MID = -16.5           # page y between the two staves
 CAMERA = (-20.0, -22.0, 6.0)  # from the point it looks at, when nothing needs a wider shot
 LAMP = (-3.0, 0.0, 5.0)     # from that point

@@ -4,13 +4,16 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const BEVEL = 0.02; // staff spaces the print's top edges are chamfered by: where its gloss catches the light
 const MITRE = 2; // longest a stroke's corner may reach, in stroke widths
+const STAFF_LINES = 0.5; // of the print's height: the notes stand over the staff lines they cross, as ink printed on them
 
-/** LilyPond's engraved SVG as one mesh of raised print, `height` thick, standing on the paper at z = 0, in page units
- * (staff spaces, y up), the coordinates the comets fly in. Vector shapes rather than a texture: sharp however close the
- * camera gets, and no texture size limit on long scores. SVGLoader ignores the root viewBox, so the shapes come out in
- * LilyPond's units, which are staff spaces. */
+/** LilyPond's engraved SVG as one mesh of raised print, `height` thick (the staff lines less), on the paper at z = 0,
+ * in page units (staff spaces, y up), the coordinates the comets fly in. Two groups, one material each: the print (0)
+ * and the staff lines (1). Vector shapes rather than a texture: sharp however close the camera gets, and no texture
+ * size limit on long scores. SVGLoader ignores the root viewBox, so the shapes come out in LilyPond's units, which are
+ * staff spaces. */
 export function scoreGeometry(svg: string, height: number): THREE.BufferGeometry {
-	const shapes: THREE.Shape[] = [];
+	const print: THREE.Shape[] = [];
+	const staff: THREE.Shape[] = [];
 	// LilyPond inks in currentColor, which three's colour parser doesn't know; the ink's material sets the colour anyway
 	for (const path of new SVGLoader().parse(svg.replaceAll('currentColor', 'black')).paths) {
 		const style = path.userData?.style as (StrokeStyle & { fill?: string; stroke?: string }) | undefined;
@@ -21,20 +24,23 @@ export function scoreGeometry(svg: string, height: number): THREE.BufferGeometry
 			for (const shape of filled) {
 				// beams and slurs are filled and stroked: the stroke widens the outline by half its width
 				const outline = width ? Object.assign(new THREE.Shape(grown(shape.getPoints(4), width / 2)), { holes: shape.holes }) : shape;
-				shapes.push(outline);
+				print.push(outline);
 			}
 		// staff lines are strokes only
 		else if (width)
 			for (const sub of path.subPaths) {
 				const outline = band(sub.getPoints(4), width);
-				if (outline.length) shapes.push(new THREE.Shape(outline));
+				if (outline.length) staff.push(new THREE.Shape(outline));
 			}
 	}
-	if (!shapes.length) throw new Error('the score has no shapes');
-	const depth = height - 2 * BEVEL;
-	const parts = shapes.map((shape) => {
+	if (!print.length) throw new Error('the score has no shapes');
+	const shapes: (readonly [THREE.Shape, number])[] = [
+		...print.map((s) => [s, height] as const),
+		...staff.map((s) => [s, height * STAFF_LINES] as const)
+	];
+	const parts = shapes.map(([shape, tall]) => {
 		const g = new THREE.ExtrudeGeometry(shape, {
-			depth,
+			depth: tall - 2 * BEVEL,
 			curveSegments: 4,
 			bevelEnabled: true,
 			bevelThickness: BEVEL,
@@ -42,16 +48,20 @@ export function scoreGeometry(svg: string, height: number): THREE.BufferGeometry
 			bevelOffset: -BEVEL, // chamfer inwards, so the print's foot is the engraved outline
 			bevelSegments: 1
 		});
+		// SVG y points down the page. Turning it over about x flips y without mirroring (which would turn the faces
+		// inside out); it sends the print below the paper, so lift it back: it ran from -BEVEL to tall - BEVEL
+		g.scale(1, -1, -1).translate(0, 0, tall - BEVEL);
 		const only = new THREE.BufferGeometry();
 		for (const name of ['position', 'normal']) only.setAttribute(name, g.getAttribute(name));
 		g.dispose();
 		return only;
 	});
+	const inked = parts.slice(0, print.length).reduce((n, g) => n + g.getAttribute('position').count, 0);
 	const merged = mergeGeometries(parts);
 	for (const g of parts) g.dispose();
-	// SVG y points down the page. Turning it over about x flips y without mirroring (which would turn the faces inside
-	// out); it sends the print below the paper, so lift it back: it ran from -BEVEL to depth + BEVEL
-	return merged.scale(1, -1, -1).translate(0, 0, depth + BEVEL);
+	merged.addGroup(0, inked, 0);
+	merged.addGroup(inked, merged.getAttribute('position').count - inked, 1);
+	return merged;
 }
 
 /** A closed outline pushed out by `by`: of the two ways to offset it, the larger. */

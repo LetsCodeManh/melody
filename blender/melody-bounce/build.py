@@ -9,10 +9,10 @@ from mathutils import Matrix, Vector
 HERE = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/'
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
-import flight, lights, settings
-for m in (flight, lights, settings):
+import flight, lights, score, settings
+for m in (flight, lights, score, settings):
     importlib.reload(m)
-from settings import FPS, SAMPLES, LEAD, SPACE, INK, STAFF_MID
+from settings import FPS, SAMPLES, LEAD, SPACE, INK, STAFF_LINES, STAFF_MID
 
 CAMERA, LAMP = Vector(settings.CAMERA), Vector(settings.LAMP)
 
@@ -58,19 +58,19 @@ def principled(name, colour, roughness):
 
 
 def score_mesh(sc, svg, page):
-    """The importer's curves, filled and merged into one mesh in page units scaled to SPACE (y up, origin at the
-    SVG's top-left), standing INK off the paper."""
+    """The importer's curves, filled and merged into two meshes in page units scaled to SPACE (y up, origin at the
+    SVG's top-left): the print standing INK off the paper, glossy, and the staff lines under it, lower and matte."""
     before = set(bpy.data.objects)
     bpy.ops.import_curve.svg(filepath=svg)
     curves = [o for o in bpy.data.objects if o not in before]
     k = SPACE / (page['width'] / page['box'])
     to_page = Matrix.Translation((0, -page['height'] * k, 0)) @ Matrix.Scale(k, 4)
     deps = bpy.context.evaluated_depsgraph_get()
-    bm = bmesh.new()
+    ink, staff = bmesh.new(), bmesh.new()
     for ob in curves:
         me = bpy.data.meshes.new_from_object(ob.evaluated_get(deps))
         me.transform(to_page @ ob.matrix_world)
-        bm.from_mesh(me)
+        (staff if ob.name.startswith(score.STAFF_LINE) else ink).from_mesh(me)
         bpy.data.meshes.remove(me)
     imported = {c for ob in curves for c in ob.users_collection if c != sc.collection}
     for ob in curves:
@@ -79,14 +79,19 @@ def score_mesh(sc, svg, page):
         bpy.data.curves.remove(data)
     for c in imported:
         bpy.data.collections.remove(c)
-    mesh = bpy.data.meshes.new('Score')
+    inked(sc, 'Staff', staff, INK * STAFF_LINES, principled('Staff lines', (0.02, 0.02, 0.02, 1), 0.6)[0])
+    return inked(sc, 'Score', ink, INK, principled('Ink', (0.008, 0.008, 0.008, 1), 0.3)[0])
+
+
+def inked(sc, name, bm, height, mat):
+    """The faces in bm as an object of raised ink, height off the paper; frees bm."""
+    mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
-    ob = bpy.data.objects.new('Score', mesh)
+    ob = bpy.data.objects.new(name, mesh)
     sc.collection.objects.link(ob)
     solid = ob.modifiers.new('Ink', 'SOLIDIFY')
-    solid.thickness, solid.offset = INK, 1.0
-    mat, _ = principled('Ink', (0.008, 0.008, 0.008, 1), 0.3)
+    solid.thickness, solid.offset = height, 1.0
     mesh.materials.append(mat)
     return ob
 

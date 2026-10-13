@@ -75,7 +75,8 @@ songs/<song>.mid
 - **Depth of field:** focus on the point looked at (f/1.2 in Blender), so the score blurs away into the dark.
 
 ## Blender (`build.py`, `lights.py`, `check.py`)
-- The score is the engraved SVG imported as curves, filled and merged into one mesh, 1.5 mm off the paper.
+- The score is the engraved SVG imported as curves, filled and merged into two meshes: the print 1.5 mm off the paper,
+  glossy black, and the staff lines half as high, a shade lighter and matte, so the notes stand over the lines.
 - Each comet is a curve whose visible stretch (bevel start and end) is keyframed, so no frame handlers are needed.
   Heads share one material and glow from a per-head property.
 - EEVEE at 16 samples (looks the same as 64 here), 1080p60, bloom in the compositor, AgX Punchy.
@@ -87,7 +88,7 @@ songs/<song>.mid
 - Same plan as Blender, with live-only touches:
   - comets coloured by pitch and sized by weight
   - ripples and sparks where they land, heads cooling to embers
-  - the print raised 0.1 staff spaces
+  - the print raised 0.1 staff spaces, the staff lines half that, lighter and matte, as in Blender
   - a curtain: the light rises at the start and fades to black at the end
 - Comets, heads, ripples and sparks are one draw each, moved on the GPU by a time uniform: nothing is updated per note
   per frame.

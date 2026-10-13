@@ -244,12 +244,13 @@ def held_heads(svg, source):
             out.append(Head(note, x, y))
     return out
 
+STAFF_LINE = 'staff-line'  # the importer names each object after its id, adding .001, .002, ...
 LINE = re.compile(r'<line [^>]*?stroke-width="([\d.]+)"[^>]*?x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/>')
 
 
 def importable(svg, out):
     """A copy Blender's SVG importer reads fully: it skips anything inside <a> (every notehead) and draws no strokes,
-    so links are unwrapped and the (horizontal) staff lines become thin rectangles."""
+    so links are unwrapped and the (horizontal) staff lines become thin rectangles, named so they can be told apart."""
     with open(svg) as f:
         text = f.read()
 
@@ -257,7 +258,7 @@ def importable(svg, out):
         width, x1, y1, x2, y2 = map(float, m.groups())
         if y1 != y2:
             raise ValueError('only horizontal lines are expected')
-        return (f'<rect x="{x1}" y="{y1 - width / 2}" width="{x2 - x1}" height="{width}" '
+        return (f'<rect id="{STAFF_LINE}" x="{x1}" y="{y1 - width / 2}" width="{x2 - x1}" height="{width}" '
                 f'fill="currentColor"/>')
 
     text = re.sub(r'<a [^>]*>|</a>', '', LINE.sub(rect, text))

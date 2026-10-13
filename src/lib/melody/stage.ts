@@ -26,6 +26,7 @@ const BLOOM = 0.25;
 const FILL_SWELL = 0.4; // share of FILL_POWER
 const BLOOM_SWELL = 0.3;
 const INK_COLOUR = new THREE.Color(0.006, 0.006, 0.006);
+const STAFF_COLOUR = new THREE.Color(0.015, 0.015, 0.015); // the staff lines a shade lighter and matte, as in build.py
 
 export interface Stage {
 	/** Shows a song: its score on the paper, its comets and heads. */
@@ -52,8 +53,11 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	const fill = new THREE.PointLight(FILL, FILL_POWER, 0, 2);
 	scene.add(fill);
 	const paper = createPaper(renderer.capabilities.getMaxAnisotropy());
-	// glossy, as printing ink dries: its chamfered edges catch the fill and the glows
-	const ink = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: INK_COLOUR, roughness: 0.3 }));
+	// glossy, as printing ink dries: its chamfered edges catch the fill and the glows; the staff lines under it matte
+	const ink = new THREE.Mesh(new THREE.BufferGeometry(), [
+		new THREE.MeshStandardMaterial({ color: INK_COLOUR, roughness: 0.3 }),
+		new THREE.MeshStandardMaterial({ color: STAFF_COLOUR, roughness: 0.6 })
+	]);
 	scene.add(paper.mesh, ink);
 	const overlay = new THREE.Scene(); // the comets, after the depth of field
 	let song: Prepared | undefined;
@@ -149,7 +153,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			lights?.dispose();
 			paper.dispose();
 			ink.geometry.dispose();
-			ink.material.dispose();
+			for (const m of ink.material) m.dispose();
 			focus.dispose();
 			bloom.dispose();
 			composer.dispose();
