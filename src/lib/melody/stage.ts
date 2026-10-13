@@ -4,9 +4,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { curtainAt } from './curtain';
 import { createLights, type Lights } from './lights';
 import { createPulse, noteLooks } from './looks';
-import { framingAt, INK, type Prepared } from './melody';
+import { duration, framingAt, INK, type Prepared } from './melody';
 import { createPaper } from './paper';
 import { scoreGeometry } from './score';
 
@@ -92,7 +93,9 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		if (!song || !lights) return;
 		const t = time();
 		const { settings } = song;
-		const { centre, back } = framingAt(song, t);
+		const curtain = curtainAt(duration(song), t);
+		const { centre, back: framed } = framingAt(song, t);
+		const back = framed * curtain.back;
 		// camera and fill ride along with the point looked at (build.follow); the camera backs off along its view
 		offset.fromArray(settings.camera).multiplyScalar(back);
 		camera.position.set(centre, settings.staffMid, 0).add(offset);
@@ -104,6 +107,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		// spread squared: as bright where it falls straight down, however high it rises
 		fill.intensity = FILL_POWER * spread * spread * (1 + FILL_SWELL * swell);
 		bloom.strength = BLOOM + BLOOM_SWELL * swell;
+		renderer.toneMappingExposure = curtain.light; // read by the output pass: the glows and comets dim with the rest
 		lights.setTime(t);
 		composer.render();
 	});

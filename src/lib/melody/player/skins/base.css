@@ -266,7 +266,66 @@
 		text-align: center;
 	}
 
-	/* messages: preparing a song, an error, a new skin */
+	/* the cards before and after the music: centred over the scene, under the player, letting clicks through */
+	& .card {
+		position: fixed;
+		inset: 0;
+		z-index: 5;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		color: #f2efe9;
+		font: 14px/1.3 var(--ui);
+		text-align: center;
+		-webkit-font-smoothing: antialiased;
+		pointer-events: none;
+	}
+	& .card p {
+		margin: 0;
+	}
+	& .card.loading {
+		background: rgb(3 3 4 / 0.85);
+		backdrop-filter: blur(8px);
+	}
+	& .card.end {
+		background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.6), transparent 65%);
+	}
+	& .card .caption {
+		font-size: 11px;
+		letter-spacing: 0.3em;
+		text-transform: uppercase;
+		opacity: 0.55;
+	}
+	& .card .name {
+		max-width: 80vw;
+		font-size: clamp(28px, 5vw, 56px);
+		font-weight: 600;
+		text-transform: capitalize;
+		text-wrap: balance;
+	}
+	& .card .cue {
+		font-size: 12px;
+		opacity: 0.6;
+	}
+	& .card .cue.quiet {
+		visibility: hidden;
+	}
+	& .waited {
+		font-variant-numeric: tabular-nums;
+	}
+	/* no real progress to show: the server prepares in one go, so a line breathes instead */
+	& .breath {
+		width: 120px;
+		height: 2px;
+		margin: 6px 0;
+		border-radius: 1px;
+		background: currentColor;
+		animation: melody-breath 2.4s ease-in-out infinite;
+	}
+
+	/* messages: an error, a new skin, a song added */
 	& .status {
 		position: fixed;
 		z-index: 30;
@@ -291,5 +350,19 @@
 	& .toast.error {
 		color: #ff9a8a;
 		white-space: pre-line;
+	}
+}
+
+@keyframes melody-breath {
+	50% {
+		opacity: 0.3;
+		transform: scaleX(0.25);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.melody .breath,
+	.melody .breath::before {
+		animation: none;
 	}
 }

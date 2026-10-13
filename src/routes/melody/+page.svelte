@@ -8,11 +8,14 @@
 	import Player from '#lib/melody/player/Player.svelte';
 	import SongPicker from '#lib/melody/player/SongPicker.svelte';
 	import Shortcuts from '#lib/melody/player/Shortcuts.svelte';
+	import Card from '#lib/melody/player/Card.svelte';
+	import { screenAt, withCurtain } from '#lib/melody/curtain.ts';
 	import { actionFor, type Action } from '#lib/melody/player/shortcuts.ts';
 	import { SKINS, skinAfter, type Skin } from '#lib/melody/player/skins.ts';
 
 	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
 	const SKIP = 5; // s the arrow keys jump
+	const SLOW = 300; // ms a song may take to open before the loading card shows: a prepared one opens without a flash
 
 	let host: HTMLDivElement;
 	let stage: Stage | undefined;
@@ -23,7 +26,9 @@
 	let span = $state.raw({ start: 0, end: 0 });
 	let now = $state(0);
 	let playing = $state(false);
-	let status = $state('');
+	let preparing = $state(false);
+	let slow = $state(false);
+	let waited = $state(0);
 	let error = $state('');
 	let loading = 0;
 	let skin = $state<Skin>(SKINS[0].id);
@@ -35,8 +40,11 @@
 	let toast = $state('');
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+	let slowTimer: ReturnType<typeof setTimeout> | undefined;
+	let waitTimer: ReturnType<typeof setInterval> | undefined;
 	let chooser: HTMLInputElement;
 	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
+	const screen = $derived(preparing ? (slow ? 'loading' : undefined) : screenAt({ playing, t: now, run: span }));
 
 	async function fetchOk(url: string) {
 		const res = await fetch(url);
@@ -50,7 +58,7 @@
 		playback?.dispose();
 		playback = undefined;
 		error = '';
-		status = `Preparing ${name}… the first time takes about 20 seconds.`;
+		setPreparing(true);
 		try {
 			const base = `/api/melody/${encodeURIComponent(name)}`;
 			const data: Prepared = await (await fetchOk(base)).json();
@@ -61,15 +69,27 @@
 			const sound = await audio!.decodeAudioData(wav);
 			if (ticket !== loading) return; // another song was picked meanwhile
 			stage!.show(data, svg);
-			span = duration(data);
+			span = withCurtain(duration(data));
 			playback = createPlayback(sound, audio!, span.start, span.end);
-			status = '';
+			setPreparing(false);
 			void goto(`?song=${encodeURIComponent(name)}`, { shallow: true, replace: true });
 		} catch (e) {
 			if (ticket !== loading) return;
-			status = '';
+			setPreparing(false);
+			span = { start: 0, end: 0 };
 			error = `${name}: ${(e as Error).message}`;
 		}
+	}
+
+	function setPreparing(on: boolean) {
+		preparing = on;
+		slow = false;
+		waited = 0;
+		clearTimeout(slowTimer);
+		clearInterval(waitTimer);
+		if (!on) return;
+		slowTimer = setTimeout(() => (slow = true), SLOW);
+		waitTimer = setInterval(() => waited++, 1000);
 	}
 
 	const toggle = () => (playback?.playing ? playback.pause() : playback?.play());
@@ -187,6 +207,7 @@
 		return () => {
 			clearTimeout(idleTimer);
 			clearTimeout(toastTimer);
+			setPreparing(false);
 			loading++;
 			playback?.dispose();
 			stage?.dispose();
@@ -235,8 +256,9 @@
 	/>
 	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
 
+	<Card {screen} {song} {waited} />
+
 	<div class="status" role="status">
-		{#if status}<span class="toast">{status}</span>{/if}
 		{#if error}<span class="toast error">{error}</span>{/if}
 		{#if toast}<span class="toast">{toast}</span>{/if}
 	</div>

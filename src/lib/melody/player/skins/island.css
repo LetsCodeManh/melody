@@ -146,6 +146,55 @@
 			0 10px 30px rgb(0 0 0 / 0.5);
 		font-weight: 500;
 	}
+	/* the cards as a black capsule in the middle, opening as the pill does */
+	& .card {
+		inset: 50% auto auto 50%;
+		translate: -50% -50%;
+		gap: 8px;
+		min-width: 260px;
+		padding: 24px 36px 22px;
+		border-radius: 40px;
+		background: #000;
+		box-shadow:
+			inset 0 0 0 1px rgb(255 255 255 / 0.12),
+			0 20px 60px rgb(0 0 0 / 0.6);
+		animation: island-open 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	/* while preparing, the scene behind goes dark too */
+	& .card.loading {
+		backdrop-filter: none;
+		box-shadow:
+			inset 0 0 0 1px rgb(255 255 255 / 0.12),
+			0 0 0 100vmax rgb(0 0 0 / 0.8);
+	}
+	& .card .caption {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+	}
+	& .card .caption::before {
+		content: '';
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #34c759;
+		box-shadow: 0 0 8px #34c759;
+	}
+	& .card.loading .caption::before {
+		background: #ff9f0a;
+		box-shadow: 0 0 8px #ff9f0a;
+	}
+	& .card .name {
+		font-size: clamp(22px, 3vw, 32px);
+	}
+	& .breath {
+		width: 64px;
+		height: 4px;
+		border-radius: 2px;
+	}
 }
 
 @keyframes island-open {

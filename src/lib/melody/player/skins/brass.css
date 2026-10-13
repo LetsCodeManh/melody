@@ -213,4 +213,52 @@
 		color: #f0dcae;
 		font: italic 15px 'Hoefler Text', Baskerville, Georgia, serif;
 	}
+	/* the cards as the programme's title page: an italic name between gold double rules, a diamond for a pulse */
+	& .card {
+		gap: 14px;
+		color: #d9b56a;
+		font-family: 'Hoefler Text', Baskerville, Georgia, serif;
+	}
+	& .card.loading {
+		background: rgb(8 6 3 / 0.9);
+	}
+	& .card .caption {
+		font-size: 15px;
+		font-variant: small-caps;
+		letter-spacing: 0.3em;
+		text-transform: lowercase;
+		opacity: 0.75;
+	}
+	& .card .name {
+		padding: 14px 44px;
+		border-block: 3px double rgb(217 181 106 / 0.6);
+		color: #f0dcae;
+		font-size: clamp(30px, 5vw, 58px);
+		font-style: italic;
+		font-weight: 400;
+	}
+	& .card .cue {
+		color: #f0dcae;
+		font-size: 16px;
+		font-style: italic;
+		font-variant-numeric: oldstyle-nums proportional-nums;
+		opacity: 0.8;
+	}
+	& .breath {
+		width: 9px;
+		height: 9px;
+		margin: 8px 0;
+		border-radius: 0;
+		rotate: 45deg;
+		background: #f0dcae;
+		box-shadow: 0 0 12px rgb(240 220 174 / 0.7);
+		animation-name: brass-pulse;
+	}
+}
+
+@keyframes brass-pulse {
+	50% {
+		opacity: 0.35;
+		scale: 0.6;
+	}
 }
