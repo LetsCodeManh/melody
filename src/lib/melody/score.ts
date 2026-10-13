@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SVGLoader, type StrokeStyle } from 'three/addons/loaders/SVGLoader.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { extrude } from './extrude';
 
 const BEVEL = 0.02; // staff spaces the print's top edges are chamfered by: where its gloss catches the light
 const MITRE = 2; // longest a stroke's corner may reach, in stroke widths
@@ -19,7 +19,7 @@ export function scoreGeometry(svg: string, height: number): THREE.BufferGeometry
 		const style = path.userData?.style as (StrokeStyle & { fill?: string; stroke?: string }) | undefined;
 		const width = style?.stroke && style.stroke !== 'none' ? style.strokeWidth : 0;
 		// SVGLoader fills by default, so a <line> comes with a fill of no area: it is a stroke only
-		const filled = style?.fill && style.fill !== 'none' ? path.toShapes().filter((s) => Math.abs(THREE.ShapeUtils.area(s.getPoints())) > 1e-6) : [];
+		const filled = style?.fill && style.fill !== 'none' ? path.toShapes().filter((s) => Math.abs(THREE.ShapeUtils.area(s.getPoints(4))) > 1e-6) : [];
 		if (filled.length)
 			for (const shape of filled) {
 				// beams and slurs are filled and stroked: the stroke widens the outline by half its width
@@ -34,34 +34,11 @@ export function scoreGeometry(svg: string, height: number): THREE.BufferGeometry
 			}
 	}
 	if (!print.length) throw new Error('the score has no shapes');
-	const shapes: (readonly [THREE.Shape, number])[] = [
-		...print.map((s) => [s, height] as const),
-		...staff.map((s) => [s, height * STAFF_LINES] as const)
-	];
-	const parts = shapes.map(([shape, tall]) => {
-		const g = new THREE.ExtrudeGeometry(shape, {
-			depth: tall - 2 * BEVEL,
-			curveSegments: 4,
-			bevelEnabled: true,
-			bevelThickness: BEVEL,
-			bevelSize: BEVEL,
-			bevelOffset: -BEVEL, // chamfer inwards, so the print's foot is the engraved outline
-			bevelSegments: 1
-		});
-		// SVG y points down the page. Turning it over about x flips y without mirroring (which would turn the faces
-		// inside out); it sends the print below the paper, so lift it back: it ran from -BEVEL to tall - BEVEL
-		g.scale(1, -1, -1).translate(0, 0, tall - BEVEL);
-		const only = new THREE.BufferGeometry();
-		for (const name of ['position', 'normal']) only.setAttribute(name, g.getAttribute(name));
-		g.dispose();
-		return only;
-	});
-	const inked = parts.slice(0, print.length).reduce((n, g) => n + g.getAttribute('position').count, 0);
-	const merged = mergeGeometries(parts);
-	for (const g of parts) g.dispose();
-	merged.addGroup(0, inked, 0);
-	merged.addGroup(inked, merged.getAttribute('position').count - inked, 1);
-	return merged;
+	// chamfered inwards, so the print's foot is the engraved outline
+	return extrude(
+		[print.map((shape) => ({ shape, height })), staff.map((shape) => ({ shape, height: height * STAFF_LINES }))],
+		BEVEL
+	);
 }
 
 /** A closed outline pushed out by `by`: of the two ways to offset it, the larger. */

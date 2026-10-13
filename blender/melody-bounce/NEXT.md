@@ -31,13 +31,18 @@ lens, where the frame is narrower than the 19-wide shot measured on the staves. 
 head through the real perspective (`pull_back`) and backs off further when one needs it; the old width stays the floor,
 so songs without low notes frame exactly as before. All 19 pass. Not yet looked at by eye on the page.
 
+## Done since: the score's mesh built 3× faster
+`extrude.ts` writes the print's solids straight into one buffer, the same vertices as three's `ExtrudeGeometry` (pinned
+by `extrude.spec.ts`; all 19 songs match to 2e-9, the page pixel for pixel). All of Me: 660 → 205 ms, 570 → 114 MB
+allocated (most of what is left is SVGLoader). No mesh cache: not needed at 200 ms, and it would be 50 MB a song.
+The tab's peak on a switch did not move (~350 MB, ~175 after GC): the garbage was young and swept as it went. The peak is
+big buffers waiting for a full GC (the new WAV and its decoded audio, the last song's audio, the uploaded mesh), bounded,
+not a leak.
+
 ## Next, in order
-1. **Loading spike.** Building the score from the SVG makes ~130 MB of garbage per song load (thousands of
-   `ExtrudeGeometry` merged in `src/lib/melody/score.ts`); the tab climbs to ~340 MB after a few switches until GC.
-   Write the vertices into one buffer directly, or prepare the mesh in Python. Measure first.
-2. **GPU work.** The depth-of-field pass renders the whole score (2.1 M vertices) a second time each frame. Measure
+1. **GPU work.** The depth-of-field pass renders the whole score (2.1 M vertices) a second time each frame. Measure
    frame time on a long song before touching it.
-3. **Small:** deleting the last song (empty state) was never verified; after a GPU reset the freed meshes can't be
+2. **Small:** deleting the last song (empty state) was never verified; after a GPU reset the freed meshes can't be
    re-uploaded, so a "reload the page" message would help.
 
 ## Skipped on purpose (YAGNI)
