@@ -185,7 +185,10 @@ def write(song, path):
     src.add('\\version "2.24.0"')
     src.add('\\header { tagline = ##f }')
     src.add('\\paper { page-breaking = #ly:one-line-breaking indent = 0 }')
-    src.add('\\layout { \\context { \\Voice \\remove "Note_heads_engraver" \\consists "Completion_heads_engraver" '
+    # ledger lines as thin as the staff lines, and marked so engrave() can redraw them as staff lines
+    src.add('\\layout { \\context { \\Staff \\override StaffSymbol.ledger-line-thickness = #\'(1 . 0) '
+            f'\\override LedgerLineSpanner.color = #(rgb-color {LEDGER_MARK}) }} '
+            '\\context { \\Voice \\remove "Note_heads_engraver" \\consists "Completion_heads_engraver" '
             '\\remove "Rest_engraver" \\consists "Completion_rest_engraver" } }')
     src.add('\\score { \\new PianoStaff <<')
     for clef, staff in zip(('treble', 'bass'), chords(song)):
@@ -228,14 +231,39 @@ def _gap(staff, start, stop, first, beat):
 
 
 def engrave(ly):
-    """LilyPond source to SVG with point-and-click links; returns the SVG path."""
+    """LilyPond source to SVG with point-and-click links, its ledger lines drawn as the staff lines are; returns the
+    SVG path."""
     folder, name = os.path.split(ly)
     stem = os.path.splitext(name)[0]
     run = subprocess.run(['lilypond', '-dbackend=svg', '-dpoint-and-click', '-o', stem, name],
                          cwd=folder, capture_output=True, text=True)
     if run.returncode:
         raise RuntimeError(run.stderr[-2000:])
-    return os.path.join(folder, stem + '.svg')
+    svg = os.path.join(folder, stem + '.svg')
+    with open(svg) as f:
+        text = f.read()
+    with open(svg, 'w') as f:
+        f.write(_ledgers_as_lines(text))
+    return svg
+
+
+def _ledgers_as_lines(text):
+    """LilyPond fills ledger lines as bars and strokes the staff lines: the ledger lines, in their marked groups, are
+    redrawn as strokes, so the page and Blender print them as staff lines (lower and matte) rather than as raised ink."""
+    out, depth = [], 0
+    for line in text.split('\n'):
+        if not depth and line.startswith(LEDGERS):
+            depth, line = 1, '<g>'
+        elif depth:
+            depth += line.count('<g') - line.count('</g>')
+            bar = BAR.fullmatch(line)
+            if bar:
+                x, y, width, height = map(float, bar.groups())
+                line = (f'<line stroke-linejoin="round" stroke-linecap="round" stroke-width="{height:.4f}" '
+                        f'stroke="currentColor" x1="{x + height / 2:.4f}" y1="{y + height / 2:.4f}" '
+                        f'x2="{x + width - height / 2:.4f}" y2="{y + height / 2:.4f}"/>')
+        out.append(line)
+    return '\n'.join(out)
 
 
 LINK = re.compile(r'textedit://[^"]*?:(\d+):(\d+):\d+"')
@@ -303,6 +331,10 @@ def ties(svg):
     return out
 
 
+# the ledger lines' colour in LilyPond's SVG (as it writes it), so engrave() can find them
+LEDGER_MARK = '0.01 0.02 0.03'
+LEDGERS = '<g color="rgba(1.0000%, 2.0000%, 3.0000%, 100.0000%)">'
+BAR = re.compile(r'<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"[^>]*/>')
 STAFF_LINE = 'staff-line'  # the importer names each object after its id, adding .001, .002, ...
 LINE = re.compile(r'<line [^>]*?stroke-width="([\d.]+)"[^>]*?x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/>')
 

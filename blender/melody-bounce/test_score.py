@@ -168,6 +168,18 @@ class EngraveTest(unittest.TestCase):
         self.assertEqual({h.note for h in held}, {4})
         self.assertTrue(all(h.x > by_note[4].x for h in held))
 
+    def test_ledger_lines_are_drawn_as_staff_lines(self):
+        # middle C under the treble staff stands on a ledger line: printed as the staff lines are, a stroke as thick
+        with tempfile.TemporaryDirectory() as folder:
+            ly = os.path.join(folder, 'ledger.ly')
+            score.write(song((0, 4, 60), (4, 4, 67)), ly)
+            with open(score.engrave(ly)) as f:
+                text = f.read()
+        widths = [float(m.group(1)) for m in score.LINE.finditer(text)]
+        self.assertEqual(len(widths), 11)  # two staves of five, and the ledger line
+        self.assertEqual(set(widths), {0.1})
+        self.assertNotIn(score.LEDGERS, text)
+
     def test_a_waltz_with_a_pickup_is_barred_in_three_after_it(self):
         # a quarter before the first bar, then oom-pah-pah; the last note is held from beat two over the barline
         waltz = [(4 + 12 * b + t, 4, p) for b in range(5) for t, p in ((0, 48), (4, 64), (8, 64))]
