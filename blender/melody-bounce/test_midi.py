@@ -37,6 +37,12 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((song.time, song.key, song.division), ((3, 4), -2, 480))
         self.assertEqual((song.notes[0].tick, song.notes[0].ticks), (0, 240))
 
+    def test_the_time_signature_is_the_one_lasting_longest(self):
+        # a pickup bar of 1/8, then 3/4 until the note ends at tick 2880
+        song = midi.parse_song(smf(track(b'\x00\xff\x58\x04\x01\x03\x18\x08', b'\x00\x90\x3c\x64',
+                                         b'\x81\x70\xff\x58\x04\x03\x02\x18\x08', b'\x94\x50\x80\x3c\x00')))
+        self.assertEqual(song.time, (3, 4))
+
     def test_a_file_without_a_key_signature_says_so(self):
         song = midi.parse_song(smf(track(b'\x00\x90\x3c\x64', b'\x83\x60\x80\x3c\x00')))
         self.assertEqual((song.time, song.key), ((4, 4), None))

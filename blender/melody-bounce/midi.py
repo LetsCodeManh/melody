@@ -5,7 +5,7 @@ from collections import namedtuple
 import struct
 
 Note = namedtuple('Note', 'start end pitch velocity tick ticks', defaults=(0, 0))  # tick, ticks: start and length
-Song = namedtuple('Song', 'notes division time key')  # time: (beats, beat unit); key: sharps (+) or flats (-), None if the file has none
+Song = namedtuple('Song', 'notes division time key')  # time: (beats, beat unit), the longest in force; key: sharps (+) or flats (-), None if the file has none
 
 CHORD_WINDOW = 0.02  # seconds: onsets closer than this count as one chord
 DRUMS = 9            # General MIDI channel 10: percussion, which has no pitch to engrave
@@ -37,9 +37,18 @@ def parse_song(data):
             events += _track(data[pos + 8:pos + 8 + size])
         pos += 8 + size
     events.sort(key=lambda e: (e[0], e[1]))
-    time = next(((a, b) for _, _, kind, a, b, _ in events if kind == 'time'), (4, 4))
+    time = _longest([(tick, (a, b)) for tick, _, kind, a, b, _ in events if kind == 'time'], events[-1][0] if events else 0)
     key = next((a for _, _, kind, a, _, _ in events if kind == 'key'), None)
     return Song(_notes(events, division), division, time, key)
+
+
+def _longest(times, end):
+    """The time signature in force longest, 4/4 for a file without one: a file may open with a pickup bar of its own,
+    or change for a closing bar."""
+    lasts = {}
+    for (tick, time), (following, _) in zip(times, times[1:] + [(end, None)]):
+        lasts[time] = lasts.get(time, 0) + following - tick
+    return max(lasts, key=lasts.get, default=(4, 4))
 
 
 def _varlen(data, i):
