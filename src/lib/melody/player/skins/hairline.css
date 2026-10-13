@@ -1,0 +1,173 @@
+/* Hairline: almost nothing. One line of light along the bottom edge, the title in a corner like a caption. */
+.melody[data-skin='hairline'] {
+	& .player {
+		inset: auto 0 0 0;
+		padding: 70px 32px 24px;
+		gap: 16px;
+		background: linear-gradient(transparent, rgb(0 0 0 / 0.6));
+		color: #f4ead6;
+		--away-y: 0;
+
+		& .play {
+			width: 22px;
+			height: 22px;
+			opacity: 0.85;
+		}
+		& .play svg {
+			width: 100%;
+			height: 100%;
+		}
+		& .play:hover {
+			opacity: 1;
+		}
+		& .title {
+			gap: 3px;
+		}
+		& .label {
+			display: block;
+			font-size: 9.5px;
+			letter-spacing: 0.24em;
+			text-transform: uppercase;
+			opacity: 0.45;
+		}
+		& .name {
+			font-size: 13px;
+			font-weight: 400;
+			letter-spacing: 0.04em;
+		}
+		& .progress {
+			position: absolute;
+			inset: auto 0 0 0;
+			height: 14px;
+			align-items: flex-end;
+		}
+		& .track {
+			height: 1px;
+			border-radius: 0;
+			background: rgb(255 255 255 / 0.1);
+			overflow: visible;
+		}
+		& .progress:hover .track {
+			height: 3px;
+		}
+		& .fill {
+			background: #f4ead6;
+			box-shadow:
+				0 0 8px rgb(255 214 150 / 0.9),
+				0 0 22px rgb(255 190 110 / 0.5);
+		}
+		& .time {
+			margin-left: auto;
+			font-size: 11px;
+			letter-spacing: 0.08em;
+			opacity: 0.5;
+		}
+	}
+
+	/* the picker and the keys: no box, just type over a darkened scene */
+	& .backdrop {
+		background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.88));
+		backdrop-filter: blur(6px);
+	}
+	& .panel {
+		overflow: visible;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		backdrop-filter: none;
+		box-shadow: none;
+		color: #f4ead6;
+	}
+	& .picker {
+		width: min(560px, calc(100vw - 48px));
+	}
+	& .find {
+		border-bottom: 1px solid rgb(244 234 214 / 0.25);
+	}
+	& .find input {
+		padding: 10px 0;
+		font-size: 28px;
+		font-weight: 200;
+		letter-spacing: 0.02em;
+		text-align: center;
+	}
+	& .songs {
+		max-height: 46vh;
+		padding: 18px 0 0;
+	}
+	& .song {
+		justify-content: center;
+		padding: 8px 0;
+		border-radius: 0;
+		font-size: 15px;
+		font-weight: 300;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		opacity: 0.45;
+		transition:
+			opacity 0.2s,
+			letter-spacing 0.3s;
+	}
+	& .song.chosen {
+		background: none;
+		letter-spacing: 0.2em;
+		text-shadow: 0 0 18px rgb(255 214 150 / 0.7);
+		opacity: 1;
+	}
+	& .song.current::after {
+		content: none;
+	}
+	& .song.current::before {
+		content: '';
+		width: 5px;
+		height: 5px;
+		margin-right: 12px;
+		border-radius: 50%;
+		background: currentColor;
+		box-shadow: 0 0 8px rgb(255 214 150);
+	}
+	& .none {
+		text-align: center;
+		letter-spacing: 0.12em;
+	}
+	& .hint {
+		padding-top: 24px;
+		border: 0;
+		font-size: 9.5px;
+		letter-spacing: 0.2em;
+		text-align: center;
+		text-transform: uppercase;
+	}
+	& .keys h2 {
+		font-size: 9.5px;
+		font-weight: 400;
+		letter-spacing: 0.4em;
+		text-align: center;
+	}
+	& .keys dl {
+		gap: 12px 24px;
+	}
+	& .keys dd {
+		font-weight: 300;
+		letter-spacing: 0.04em;
+	}
+	& kbd {
+		padding: 0 2px 3px;
+		border: 0;
+		border-bottom: 1px solid rgb(244 234 214 / 0.4);
+		border-radius: 0;
+		background: none;
+		letter-spacing: 0.08em;
+	}
+	/* messages as captions */
+	& .toast {
+		padding: 0;
+		background: none;
+		backdrop-filter: none;
+		color: #f4ead6;
+		font-size: 10.5px;
+		letter-spacing: 0.24em;
+		text-transform: uppercase;
+		text-shadow: 0 1px 12px #000;
+	}
+}

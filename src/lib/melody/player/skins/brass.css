@@ -1,0 +1,198 @@
+/* Brass: a concert programme to match the engraved score. Gold rules, small caps, italic serif, old-style figures. */
+.melody[data-skin='brass'] {
+	& .player {
+		left: 50%;
+		bottom: 28px;
+		translate: -50%;
+		width: min(640px, calc(100vw - 32px));
+		padding: 10px 24px 10px 12px;
+		gap: 18px;
+		border: 1px solid rgb(217 181 106 / 0.55);
+		border-radius: 3px;
+		outline: 1px solid rgb(217 181 106 / 0.2);
+		outline-offset: 4px;
+		background: linear-gradient(#15110b, #0b0906);
+		box-shadow: 0 18px 46px rgb(0 0 0 / 0.6);
+		color: #d9b56a;
+		font-family: 'Hoefler Text', Baskerville, Georgia, serif;
+
+		& .play {
+			width: 38px;
+			height: 38px;
+			border: 1px solid #d9b56a;
+			box-shadow: inset 0 0 0 3px #0b0906, inset 0 0 0 4px rgb(217 181 106 / 0.35);
+			transition: background 0.2s, color 0.2s;
+		}
+		& .play:hover {
+			background: #d9b56a;
+			color: #0b0906;
+		}
+		& .play svg {
+			width: 42%;
+			height: 42%;
+		}
+		& .title {
+			gap: 1px;
+			max-width: 190px;
+			padding-left: 18px;
+			border-left: 1px solid rgb(217 181 106 / 0.3);
+		}
+		& .label {
+			display: block;
+			font-size: 11px;
+			font-variant: small-caps;
+			letter-spacing: 0.14em;
+			text-transform: lowercase;
+			opacity: 0.6;
+		}
+		& .name {
+			font-size: 18px;
+			font-style: italic;
+			color: #f0dcae;
+		}
+		& .track {
+			height: 1px;
+			overflow: visible;
+			background: rgb(217 181 106 / 0.3);
+		}
+		& .progress:hover .track {
+			height: 1px;
+		}
+		& .fill {
+			background: #d9b56a;
+		}
+		/* a diamond riding the end of the gold rule */
+		& .fill::after {
+			content: '';
+			position: absolute;
+			right: -4px;
+			top: -3.5px;
+			width: 8px;
+			height: 8px;
+			rotate: 45deg;
+			background: #f0dcae;
+			box-shadow: 0 0 8px rgb(240 220 174 / 0.6);
+		}
+		& .time {
+			font-size: 14px;
+			font-variant-numeric: oldstyle-nums proportional-nums;
+			opacity: 0.8;
+		}
+	}
+
+	/* the picker as the evening's programme, the keys as its notes */
+	& .backdrop {
+		background: rgb(5 4 2 / 0.6);
+	}
+	& .panel {
+		overflow: visible;
+		border: 1px solid rgb(217 181 106 / 0.55);
+		border-radius: 3px;
+		outline: 1px solid rgb(217 181 106 / 0.2);
+		outline-offset: 5px;
+		background: linear-gradient(#15110b, #0b0906);
+		backdrop-filter: none;
+		color: #d9b56a;
+		font-family: 'Hoefler Text', Baskerville, Georgia, serif;
+	}
+	& .picker::before {
+		content: 'Programme';
+		display: block;
+		padding: 18px 0 2px;
+		font-size: 13px;
+		font-variant: small-caps;
+		letter-spacing: 0.3em;
+		text-align: center;
+		text-transform: lowercase;
+		opacity: 0.6;
+	}
+	& .find {
+		margin: 0 22px;
+		border-bottom: 1px solid rgb(217 181 106 / 0.3);
+	}
+	& .find input {
+		padding: 10px 0 12px;
+		color: #f0dcae;
+		font-size: 19px;
+		font-style: italic;
+		text-align: center;
+	}
+	& .songs {
+		padding: 10px 14px;
+	}
+	& .song {
+		padding: 8px 12px;
+		border-radius: 0;
+		color: #f0dcae;
+		font-size: 18px;
+		font-style: italic;
+	}
+	& .song::before {
+		content: '';
+		flex: none;
+		width: 7px;
+		height: 7px;
+		margin-right: 14px;
+		border: 1px solid rgb(217 181 106 / 0.5);
+		rotate: 45deg;
+	}
+	& .song.chosen {
+		background: rgb(217 181 106 / 0.08);
+	}
+	& .song.chosen::before {
+		border-color: #f0dcae;
+		background: #f0dcae;
+		box-shadow: 0 0 8px rgb(240 220 174 / 0.6);
+	}
+	& .song.current::after {
+		content: 'now playing';
+		color: #d9b56a;
+		font-size: 13px;
+		font-style: normal;
+		font-variant: small-caps;
+		letter-spacing: 0.14em;
+		text-transform: lowercase;
+		opacity: 0.8;
+	}
+	& .hint {
+		margin: 0 22px;
+		padding: 10px 0 14px;
+		border-top: 1px solid rgb(217 181 106 / 0.25);
+		font-size: 13px;
+		font-style: italic;
+		text-align: center;
+	}
+	& .keys {
+		padding: 24px 32px 26px;
+	}
+	& .keys h2 {
+		font-size: 14px;
+		font-weight: 400;
+		font-variant: small-caps;
+		letter-spacing: 0.3em;
+		text-align: center;
+		text-transform: lowercase;
+	}
+	& .keys dd {
+		color: #f0dcae;
+		font-size: 15px;
+		font-style: italic;
+	}
+	& kbd {
+		border: 1px solid rgb(217 181 106 / 0.6);
+		border-radius: 2px;
+		background: none;
+		color: #d9b56a;
+		font: 13px 'Hoefler Text', Baskerville, Georgia, serif;
+		letter-spacing: 0.06em;
+	}
+	/* messages on a small gold-ruled card */
+	& .toast {
+		padding: 7px 18px;
+		border: 1px solid rgb(217 181 106 / 0.5);
+		border-radius: 2px;
+		background: #0b0906;
+		color: #f0dcae;
+		font: italic 15px 'Hoefler Text', Baskerville, Georgia, serif;
+	}
+}

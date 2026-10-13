@@ -1,0 +1,191 @@
+/* Terminal: a command line. The song as a path, the progress in blocks, a cursor blinking at the end. */
+.melody[data-skin='terminal'] {
+	& .player {
+		left: 24px;
+		bottom: 24px;
+		gap: 12px;
+		width: min(620px, calc(100vw - 48px));
+		padding: 10px 16px;
+		border: 1px solid rgb(232 217 176 / 0.25);
+		background: rgb(0 0 0 / 0.78);
+		color: #e8d9b0;
+		font: 13px/1.2 'SF Mono', ui-monospace, Menlo, monospace;
+
+		& .play {
+			display: flex;
+			align-items: center;
+			width: auto;
+			height: auto;
+			border-radius: 0;
+		}
+		& .play::before {
+			content: '[';
+		}
+		& .play::after {
+			content: ']';
+		}
+		& .play svg {
+			width: 12px;
+			height: 12px;
+			margin: 0 3px;
+		}
+		& .play:hover {
+			color: #fff;
+		}
+		& .name {
+			text-transform: none;
+		}
+		& .name::before {
+			content: '~/songs/';
+			opacity: 0.45;
+		}
+		& .time {
+			display: contents;
+		}
+		& .now {
+			order: 3;
+		}
+		& .progress {
+			order: 4;
+			height: 16px;
+		}
+		& .end {
+			order: 5;
+		}
+		& .end::before {
+			content: none;
+		}
+		& .end::after {
+			content: '▌';
+			margin-left: 6px;
+			animation: terminal-blink 1.1s steps(1) infinite;
+		}
+		& .track,
+		& .progress:hover .track {
+			height: 11px;
+			border-radius: 0;
+			background: repeating-linear-gradient(90deg, rgb(232 217 176 / 0.14) 0 6px, transparent 6px 8px);
+		}
+		& .fill {
+			background: repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 8px);
+		}
+		& button:focus-visible,
+		& .progress:has(input:focus-visible) .track {
+			outline: 1px dashed currentColor;
+		}
+	}
+
+	/* the picker as a fuzzy finder, the keys as a man page */
+	& .backdrop {
+		background: rgb(0 0 0 / 0.55);
+		backdrop-filter: none;
+	}
+	& .panel {
+		border: 1px solid rgb(232 217 176 / 0.3);
+		border-radius: 0;
+		background: rgb(0 0 0 / 0.92);
+		backdrop-filter: none;
+		box-shadow: none;
+		color: #e8d9b0;
+		font: 13px/1.5 'SF Mono', ui-monospace, Menlo, monospace;
+	}
+	& .picker {
+		width: min(520px, calc(100vw - 32px));
+	}
+	& .find {
+		padding-left: 14px;
+		border-bottom: 1px dashed rgb(232 217 176 / 0.25);
+	}
+	& .find::before {
+		content: '❯';
+		color: #fff;
+	}
+	& .find input {
+		padding: 10px 14px 10px 10px;
+		font-size: 13px;
+		caret-color: #e8d9b0;
+	}
+	& .songs {
+		padding: 6px 0;
+	}
+	& .song {
+		padding: 1px 14px;
+		border-radius: 0;
+		text-transform: none;
+		white-space: pre;
+	}
+	& .song::before {
+		content: '  ';
+	}
+	& .song.chosen {
+		background: #e8d9b0;
+		color: #000;
+	}
+	& .song.chosen::before {
+		content: '> ';
+	}
+	& .song.current::after {
+		content: '[playing]';
+		font-size: inherit;
+	}
+	& .none {
+		padding: 1px 14px;
+	}
+	& .hint {
+		padding: 6px 14px;
+		border-top: 1px dashed rgb(232 217 176 / 0.25);
+	}
+	& .keys {
+		padding: 14px 22px 16px;
+	}
+	& .keys h2 {
+		font-size: 13px;
+		font-weight: 400;
+		letter-spacing: 0;
+		text-transform: lowercase;
+	}
+	& .keys h2::before {
+		content: '$ melody --';
+	}
+	& .keys dl {
+		gap: 3px 18px;
+	}
+	& .keys dt {
+		text-align: left;
+	}
+	& kbd {
+		min-width: 0;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		font: inherit;
+	}
+	& kbd::before {
+		content: '[';
+		opacity: 0.5;
+	}
+	& kbd::after {
+		content: ']';
+		opacity: 0.5;
+	}
+	/* messages as output lines */
+	& .toast {
+		border: 1px solid rgb(232 217 176 / 0.3);
+		border-radius: 0;
+		background: rgb(0 0 0 / 0.85);
+		backdrop-filter: none;
+		color: #e8d9b0;
+		font: 12px/1.4 'SF Mono', ui-monospace, Menlo, monospace;
+	}
+	& .toast::before {
+		content: '> ';
+		opacity: 0.5;
+	}
+}
+
+@keyframes terminal-blink {
+	50% {
+		opacity: 0;
+	}
+}

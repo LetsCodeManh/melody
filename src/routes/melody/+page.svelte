@@ -5,6 +5,14 @@
 	import { createStage, type Stage } from '#lib/melody/stage.ts';
 	import { createPlayback, type Playback } from '#lib/melody/playback.ts';
 	import { duration, type Prepared } from '#lib/melody/melody.ts';
+	import Player from '#lib/melody/player/Player.svelte';
+	import SongPicker from '#lib/melody/player/SongPicker.svelte';
+	import Shortcuts from '#lib/melody/player/Shortcuts.svelte';
+	import { actionFor, type Action } from '#lib/melody/player/shortcuts.ts';
+	import { SKINS, skinAfter, type Skin } from '#lib/melody/player/skins.ts';
+
+	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
+	const SKIP = 5; // s the arrow keys jump
 
 	let host: HTMLDivElement;
 	let stage: Stage | undefined;
@@ -18,8 +26,16 @@
 	let status = $state('');
 	let error = $state('');
 	let loading = 0;
-
-	const clock = (t: number) => `${t < 0 ? '-' : ''}${Math.floor(Math.abs(t) / 60)}:${String(Math.floor(Math.abs(t) % 60)).padStart(2, '0')}`;
+	let skin = $state<Skin>(SKINS[0].id);
+	let hidden = $state(false);
+	let idle = $state(false);
+	let hover = $state(false);
+	let picking = $state(false);
+	let helping = $state(false);
+	let toast = $state('');
+	let idleTimer: ReturnType<typeof setTimeout> | undefined;
+	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
 
 	async function fetchOk(url: string) {
 		const res = await fetch(url);
@@ -56,17 +72,72 @@
 	}
 
 	const toggle = () => (playback?.playing ? playback.pause() : playback?.play());
+	const seek = (t: number) => playback?.seek(t);
+	// from the playback's own clock, not `now`: that only catches up on the next frame, and keys can repeat faster
+	const skip = (by: number) => playback && seek(playback.time() + by);
+
+	function say(text: string) {
+		toast = text;
+		clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => (toast = ''), 2200);
+	}
+
+	function wake() {
+		idle = false;
+		clearTimeout(idleTimer);
+		idleTimer = setTimeout(() => (idle = true), IDLE);
+	}
+
+	function pick(name: string) {
+		picking = false;
+		if (name === song) return;
+		song = name;
+		load(name);
+	}
+
+	function setSkin(next: Skin) {
+		skin = next;
+		localStorage.setItem('melody.skin', next);
+		const i = SKINS.findIndex((s) => s.id === next);
+		say(`${i + 1}/${SKINS.length} · ${SKINS[i].name}: ${SKINS[i].intent}`);
+	}
+
+	const actions: Record<Action, () => void> = {
+		toggle,
+		back: () => skip(-SKIP),
+		forward: () => skip(SKIP),
+		restart: () => seek(span.start),
+		next: () => songs.length && pick(songs[(songs.indexOf(song) + 1) % songs.length]),
+		previous: () => songs.length && pick(songs[(songs.indexOf(song) - 1 + songs.length) % songs.length]),
+		songs: () => ((helping = false), (picking = true)),
+		hide: () => {
+			hidden = !hidden;
+			if (hidden) say('Player hidden · H to show it');
+		},
+		fullscreen: () =>
+			void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch((e: Error) =>
+				say(`Full screen: ${e.message}`)
+			),
+		skin: () => setSkin(skinAfter(skin, 1)),
+		skinBack: () => setSkin(skinAfter(skin, -1)),
+		help: () => ((picking = false), (helping = !helping)),
+		close: () => (picking = helping = false)
+	};
 
 	function onKey(e: KeyboardEvent) {
-		// space plays and pauses, except where it already means something
 		const t = e.target;
-		if (e.code !== 'Space' || t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLButtonElement)
-			return;
+		const target = t instanceof HTMLInputElement && t.type !== 'range' ? 'text' : t instanceof HTMLButtonElement ? 'button' : 'other';
+		const action = actionFor(e, target);
+		if (!action || (picking && action !== 'close')) return;
 		e.preventDefault();
-		toggle();
+		wake();
+		actions[action]();
 	}
 
 	onMount(() => {
+		const saved = localStorage.getItem('melody.skin');
+		if (saved) skin = skinAfter(saved, 0);
+		wake();
 		audio = new AudioContext();
 		stage = createStage(host, () => {
 			const t = playback?.time() ?? span.start;
@@ -85,6 +156,8 @@
 			})
 			.catch((e: Error) => (error = `Songs: ${e.message}`));
 		return () => {
+			clearTimeout(idleTimer);
+			clearTimeout(toastTimer);
 			loading++;
 			playback?.dispose();
 			stage?.dispose();
@@ -94,34 +167,32 @@
 </script>
 
 <svelte:head><title>Melody</title></svelte:head>
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} onpointermove={wake} onpointerdown={wake} />
 
-<div class="stage" bind:this={host}></div>
+<div class="stage" class:quiet={away} bind:this={host}></div>
 
-<div class="bar">
-	<label>
-		<span class="hidden">Song</span>
-		<select bind:value={song} onchange={() => load(song)}>
-			{#each songs as name (name)}<option value={name}>{name}</option>{/each}
-		</select>
-	</label>
-	<button onclick={toggle} disabled={!playback}>{playing ? 'Pause' : 'Play'}</button>
-	<input
-		type="range"
-		aria-label="Position"
-		min={span.start}
-		max={span.end}
-		step="0.01"
-		value={now}
-		disabled={!playback}
-		oninput={(e) => playback?.seek(+e.currentTarget.value)}
+<div class="melody" data-skin={skin}>
+	<Player
+		{song}
+		ready={!!playback}
+		{playing}
+		{now}
+		{span}
+		{away}
+		bind:hover
+		onToggle={toggle}
+		onSeek={seek}
+		onSongs={() => (picking = true)}
 	/>
-	<span class="time">{clock(now)} / {clock(span.end)}</span>
-</div>
 
-<div class="status" role="status">
-	{status}
-	{#if error}<span class="error">{error}</span>{/if}
+	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} />{/if}
+	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
+
+	<div class="status" role="status">
+		{#if status}<span class="toast">{status}</span>{/if}
+		{#if error}<span class="toast error">{error}</span>{/if}
+		{#if toast}<span class="toast">{toast}</span>{/if}
+	</div>
 </div>
 
 <style>
@@ -137,59 +208,7 @@
 		position: fixed;
 		inset: 0;
 	}
-	.bar {
-		position: fixed;
-		left: 50%;
-		bottom: 20px;
-		translate: -50%;
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		width: min(720px, calc(100vw - 32px));
-		box-sizing: border-box;
-		padding: 8px 14px;
-		border: 1px solid rgb(226 189 114 / 0.25);
-		border-radius: 12px;
-		background: rgb(10 9 12 / 0.8);
-		backdrop-filter: blur(8px);
-	}
-	select,
-	button {
-		padding: 5px 10px;
-		border: 1px solid rgb(226 189 114 / 0.5);
-		border-radius: 8px;
-		background: #17141a;
-		color: inherit;
-		font: inherit;
-	}
-	button {
-		min-width: 70px;
-	}
-	input[type='range'] {
-		flex: 1;
-		accent-color: #e2bd72;
-	}
-	.time {
-		font: 12px ui-monospace, monospace;
-		white-space: nowrap;
-	}
-	.hidden {
-		position: absolute;
-		clip-path: inset(50%);
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-	}
-	.status {
-		position: fixed;
-		top: 20px;
-		width: 100%;
-		text-align: center;
-		pointer-events: none;
-	}
-	.error {
-		display: block;
-		color: #ff9a8a;
-		white-space: pre-line;
+	.stage.quiet {
+		cursor: none;
 	}
 </style>
