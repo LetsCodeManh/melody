@@ -39,7 +39,8 @@ export interface Stage {
  * as built by blender/melody-bounce/build.py. Coordinates are page units (staff spaces), z up, as in Blender.
  * time() is the song time to draw each frame. */
 export function createStage(host: HTMLElement, time: () => number): Stage {
-	const renderer = new THREE.WebGLRenderer({ antialias: true });
+	// no multisampling of its own: the canvas only ever gets the composer's finished picture, a single quad
+	const renderer = new THREE.WebGLRenderer({ antialias: false });
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 	renderer.toneMapping = THREE.AgXToneMapping; // as in the Blender render
 	host.appendChild(renderer.domElement);
@@ -59,9 +60,11 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	let lights: Lights | undefined;
 	let pulse = (_t: number) => 0;
 
-	// MSAA on the composer's buffers: the staff lines are thin
+	// MSAA where the scene is drawn: the staff lines are thin. Only there: the composer's second buffer, a clone, gets
+	// the glowing comets and full-screen passes, which don't need it, and at retina size each MSAA buffer is ~350 MB
 	const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
 	const composer = new EffectComposer(renderer, target);
+	composer.renderTarget2.samples = 0;
 	composer.addPass(new RenderPass(scene, camera));
 	const focus = new BokehPass(scene, camera, { focus: 30, aperture: 0.00025, maxblur: 0.004 });
 	composer.addPass(focus);
@@ -119,6 +122,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			song = next;
 			ink.geometry.dispose();
 			ink.geometry = scoreGeometry(svg, INK);
+			gpuOnly(ink);
 			paper.fit(next.page.box);
 			if (lights) {
 				scene.remove(lights.paper);
@@ -128,6 +132,8 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			const looks = noteLooks(next);
 			lights = createLights(next, looks);
 			lights.setViewHeight(renderer.getDrawingBufferSize(buffer).y);
+			gpuOnly(lights.paper);
+			gpuOnly(lights.overlay);
 			pulse = createPulse(next, looks);
 			scene.add(lights.paper);
 			overlay.add(lights.overlay);
@@ -152,4 +158,20 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			renderer.domElement.remove();
 		}
 	};
+}
+
+/** Lets the CPU copy of every vertex buffer under root go once it is on the GPU: nothing reads them back, and a long
+ * song's score and comets are tens of MB. */
+function gpuOnly(root: THREE.Object3D) {
+	root.traverse((o) => {
+		const g = (o as THREE.Mesh).geometry;
+		if (!g) return;
+		g.computeBoundingSphere(); // frustum culling needs it, and can't work it out once the vertices are gone
+		for (const a of Object.values(g.attributes)) (a as THREE.BufferAttribute).onUpload(release);
+		g.index?.onUpload(release);
+	});
+}
+
+function release(this: THREE.BufferAttribute) {
+	(this as { array: unknown }).array = null;
 }
