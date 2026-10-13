@@ -12,6 +12,7 @@
 	import { screenAt, withCurtain } from '#lib/melody/curtain.ts';
 	import { actionFor, type Action } from '#lib/melody/player/shortcuts.ts';
 	import { SKINS, skinAfter, type Skin } from '#lib/melody/player/skins.ts';
+	import { AFTERWARDS, afterwardsAfter, songAfter, type Afterwards } from '#lib/melody/player/afterwards.ts';
 
 	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
 	const SKIP = 5; // s the arrow keys jump
@@ -33,6 +34,7 @@
 	let error = $state('');
 	let loading = 0;
 	let skin = $state<Skin>(SKINS[0].id);
+	let afterwards = $state<Afterwards>('stop');
 	let hidden = $state(false);
 	let idle = $state(false);
 	let hover = $state(false);
@@ -53,8 +55,8 @@
 		return res;
 	}
 
-	/** Prepares the song if it needs to (the server runs prepare.py), then shows it at its start, paused. */
-	async function load(name: string) {
+	/** Prepares the song if it needs to (the server runs prepare.py), then shows it at its start, paused unless `play`. */
+	async function load(name: string, play = false) {
 		const ticket = ++loading;
 		playback?.dispose();
 		playback = undefined;
@@ -71,7 +73,9 @@
 			if (ticket !== loading) return; // another song was picked meanwhile
 			stage!.show(data, svg);
 			span = withCurtain(duration(data));
-			playback = createPlayback(sound, audio!, span.start, span.end);
+			// at the end, from inside the frame asking the time: what comes next waits for that frame to finish
+			playback = createPlayback(sound, audio!, span.start, span.end, () => setTimeout(playAfter));
+			if (play) playback.play();
 			setPreparing(false);
 			void goto(`?song=${encodeURIComponent(name)}`, { shallow: true, replace: true });
 		} catch (e) {
@@ -115,6 +119,22 @@
 		if (name === song) return;
 		song = name;
 		load(name);
+	}
+
+	/** A song has played to its end: what comes after it, as `afterwards` says. */
+	function playAfter() {
+		const next = songAfter(songs, song, afterwards);
+		if (!next) return;
+		if (next === song) return playback?.play();
+		song = next;
+		load(next, true);
+	}
+
+	function setAfterwards(next: Afterwards) {
+		afterwards = next;
+		localStorage.setItem('melody.afterwards', next);
+		say(`After each song: ${AFTERWARDS.find((a) => a.id === next)!.then}`);
+		if (screen === 'end') playAfter(); // the end card's "L keep playing" means now
 	}
 
 	/** Saves a dropped or chosen .mid as a new song and opens it; the server says what's wrong with one it won't take. */
@@ -181,6 +201,7 @@
 		restart: () => seek(span.start),
 		next: () => songs.length && pick(songs[(songs.indexOf(song) + 1) % songs.length]),
 		previous: () => songs.length && pick(songs[(songs.indexOf(song) - 1 + songs.length) % songs.length]),
+		afterwards: () => setAfterwards(afterwardsAfter(afterwards)),
 		songs: () => ((helping = false), (picking = true)),
 		add: () => chooser.click(),
 		hide: () => {
@@ -210,6 +231,8 @@
 	onMount(() => {
 		const saved = localStorage.getItem('melody.skin');
 		if (saved) skin = skinAfter(saved, 0);
+		const after = localStorage.getItem('melody.afterwards');
+		afterwards = AFTERWARDS.find((a) => a.id === after)?.id ?? 'stop';
 		wake();
 		audio = new AudioContext();
 		stage = createStage(host, () => {
@@ -280,7 +303,7 @@
 	/>
 	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
 
-	<Card {screen} {song} {waited} />
+	<Card {screen} {song} {waited} {afterwards} />
 
 	<div class="status" role="status">
 		{#if error}<span class="toast error">{error}</span>{/if}

@@ -8,6 +8,7 @@ describe('actionFor', () => {
 	it('maps keys to actions, whatever their case', () => {
 		expect(actionFor(press(' '), 'other')).toBe('toggle');
 		expect(actionFor(press('N'), 'other')).toBe('next');
+		expect(actionFor(press('l'), 'other')).toBe('afterwards');
 		expect(actionFor(press('ArrowLeft'), 'other')).toBe('back');
 		expect(actionFor(press('x'), 'other')).toBeUndefined();
 	});

@@ -5,6 +5,7 @@ export type Action =
 	| 'restart'
 	| 'next'
 	| 'previous'
+	| 'afterwards'
 	| 'songs'
 	| 'add'
 	| 'hide'
@@ -31,6 +32,7 @@ export const SHORTCUTS: Shortcut[] = [
 	{ action: 'restart', keys: ['0', 'Home'], show: '0', does: 'From the start' },
 	{ action: 'next', keys: ['n'], show: 'N', does: 'Next song' },
 	{ action: 'previous', keys: ['p'], show: 'P', does: 'Previous song' },
+	{ action: 'afterwards', keys: ['l'], show: 'L', does: 'After each song: stop, play the next, or play it again' },
 	{ action: 'songs', keys: ['s', '/'], show: 'S', does: 'Pick a song' },
 	{ action: 'add', keys: ['a'], show: 'A', does: 'Add a song (.mid), or drop one on the page' },
 	{ action: 'hide', keys: ['h'], show: 'H', does: 'Hide / show the player' },
