@@ -88,7 +88,7 @@ songs/<song>.mid
 ## Live page (`src/lib/melody/`)
 - Same plan as Blender, with live-only touches:
   - comets coloured by pitch and sized by weight
-  - ripples and sparks where they land, heads cooling to embers
+  - ripples and sparks where they land, heads cooling to embers and going dark
   - the print raised 0.1 staff spaces, the staff lines half that, lighter and matte, as in Blender
   - a curtain: the light rises at the start and fades to black at the end
 - Comets, heads, ripples and sparks are one draw each, moved on the GPU by a time uniform: nothing is updated per note

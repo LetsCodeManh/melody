@@ -4,7 +4,7 @@ import type { Look } from './looks';
 import { INK, type Prepared } from './melody';
 
 // The look of blender/melody-bounce/lights.py (lengths in staff spaces, times in s), live only: coloured by pitch,
-// sized by weight, tails by speed, heads cooling to embers
+// sized by weight, tails by speed, heads cooling to embers and going dark
 const COMET_GLOW = 14;
 const COMET_WIDTH = 0.15; // bevel radius at the comet's head, for a note of middling weight
 // the hot white at a lit head's centre, and a touch of it in the comets
@@ -18,6 +18,7 @@ const SUSTAIN = 4; // head glow at the hit, and after it settles
 const SETTLE = 0.35;
 const EMBER = 2.5; // what a lit head cools to, so the music just played stands out from what came before
 const COOL = 4; // s for a head to cool most of the way from SUSTAIN to EMBER
+const DARK = 8; // s for the ember to fade back to ink once it has cooled, as a light losing its power
 const RISE = 0.1; // for a held head (a tied note ringing on) to come up to SUSTAIN, with no flash
 const HEAD_RADII = [0.66, 0.47];
 const HEAD_TILT = THREE.MathUtils.degToRad(20);
@@ -214,12 +215,15 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			const float FLASH = ${FLASH.toFixed(4)}, SUSTAIN = ${SUSTAIN.toFixed(4)}, SETTLE = ${SETTLE.toFixed(4)};
 			const float RISE = ${RISE.toFixed(4)}, EMBER = ${EMBER.toFixed(4)}, COOL = ${COOL.toFixed(4)};
+			const float DARK = ${DARK.toFixed(4)};
 			void main() {
 				// the glow keys in lights.py, then cooling. Struck: dark until a frame before the hit, a flash as heavy
-				// as the note, settling to a steady glow. Held: rising to the steady glow as the music reaches it.
+				// as the note, settling to a steady glow. Held: rising to the steady glow as the music reaches it. Both
+				// then cool to an ember and fade back to ink.
 				float t = uTime - vHit;
 				float flash = FLASH * (0.5 + vLook.w);
 				float steady = mix(SUSTAIN, EMBER, 1.0 - exp(-max(t - SETTLE, 0.0) / COOL));
+				steady *= 1.0 - smoothstep(SETTLE + COOL, SETTLE + COOL + DARK, t);
 				float glow = vStruck < 0.5 ? steady * clamp((t + RISE) / RISE, 0.0, 1.0)
 					: t < -uFrame ? 0.0
 					: t < 0.0 ? flash * (t + uFrame) / uFrame

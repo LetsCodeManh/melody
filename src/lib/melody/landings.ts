@@ -18,6 +18,7 @@ const GLOWS = 8; // lights pooling on the paper, at the freshest landings
 const GLOW_POWER = 90; // candela, for a note of middling weight
 const GLOW_HEIGHT = 0.35; // over the print: how wide the pool spreads
 const GLOW_FADE = 2; // s for a pool to fade to a third, as newer landings take the lights
+const HANDOFF = 0.15; // s for a newer landing to count in full against an older pool
 
 export interface Landings {
 	/** On the paper: a ring of light spreading from each landing. */
@@ -44,6 +45,7 @@ export function createLandings(song: Prepared, looks: Look[], time: { value: num
  * the note, then a glow fading as the music moves on. */
 function createGlows({ flights }: Prepared, looks: Look[]) {
 	const landings = flights.map(([note, , land, , , x, y]) => ({ land, x, y, ...looks[note] })).sort((a, b) => a.land - b.land);
+	const lands = landings.map((l) => l.land);
 	const lights = Array.from({ length: GLOWS }, () => new THREE.PointLight(0xffffff, 0, 0, 2));
 	const group = new THREE.Group().add(...lights);
 	return {
@@ -61,12 +63,23 @@ function createGlows({ flights }: Prepared, looks: Look[]) {
 				light.intensity = 0;
 				if (age > 5 * GLOW_FADE) return;
 				const flash = 0.4 + 2.6 * Math.exp(-age / 0.15);
-				light.intensity = GLOW_POWER * (0.5 + at.weight) * flash * Math.exp(-age / GLOW_FADE);
+				const share = poolShare(lands, lo - 1 - k, t);
+				light.intensity = GLOW_POWER * (0.5 + at.weight) * flash * Math.exp(-age / GLOW_FADE) * share;
 				light.position.set(at.x, at.y, INK + GLOW_HEIGHT);
 				light.color.copy(at.colour);
 			});
 		}
 	};
+}
+
+/** How much of its pool the landing at `i` of the sorted `lands` keeps at `t`: less with each newer landing, eased in
+ * over HANDOFF, so it is dark by the time the GLOWS-th newer one takes its light rather than going out at once. A big
+ * chord landing together can still take a lit pool's light, under its own flash. */
+export function poolShare(lands: number[], i: number, t: number) {
+	if (lands[i] > t) return 0;
+	let [newer, count] = [0, 0];
+	for (let j = i + 1; j < lands.length && lands[j] <= t; j++, count++) newer += Math.min((t - lands[j]) / HANDOFF, 1);
+	return count >= GLOWS ? 0 : Math.max(0, 1 - (newer / (GLOWS - 1)) ** 2);
 }
 
 /** A square on the paper around each landing, as wide as its ring gets; the shader draws the ring in it. */
