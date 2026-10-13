@@ -19,10 +19,17 @@ export function createPlayback(audio: AudioBuffer, ctx: AudioClock, start: numbe
 	let source: AudioBufferSourceNode | undefined;
 	let zero = 0; // audio clock time at song time 0, while playing
 	let at = start; // song time, while paused
+	let timer: ReturnType<typeof setTimeout> | undefined;
 	// sound scheduled for now is heard outputLatency later; the picture shows what is heard
 	const heard = () => ctx.currentTime - (ctx.outputLatency ?? 0) - zero;
 
+	// the frames ask the time and so find the end, but a hidden tab draws none: a timer finds it there, looking again
+	// should the audio clock not be quite there yet
+	const watchForEnd = () => {
+		timer = setTimeout(() => playback.time() < end && watchForEnd(), Math.max(end - heard(), 0.05) * 1000);
+	};
 	const stop = () => {
+		clearTimeout(timer);
 		if (!source) return;
 		source.onended = null;
 		source.stop();
@@ -53,6 +60,7 @@ export function createPlayback(audio: AudioBuffer, ctx: AudioClock, start: numbe
 			zero = now - at;
 			// before the first note: wait for it; after: start part way into the audio
 			source.start(now + Math.max(0, -at), Math.max(0, at));
+			watchForEnd();
 		},
 		pause() {
 			if (!source) return;
