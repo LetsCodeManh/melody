@@ -3,6 +3,7 @@ import type { Look } from './looks';
 import { INK, type Prepared } from './melody';
 
 // What a comet does to the page as it lands (lengths in staff spaces, times in s), heavier notes harder
+const ON_PAPER = 0.004; // just over the paper, under the raised print
 const RIPPLE_REACH = 2.2; // radius a ring spreads to, for a note of middling weight
 const RIPPLE_WIDTH = 0.12;
 const RIPPLE_LIFE = 0.8;
@@ -13,12 +14,19 @@ const SPARK_LIFE = 0.55;
 const SPARK_GLOW = 14;
 const GRAVITY = 30;
 const DRAG = 4; // per s: sparks skid to a stop on the paper
+const GLOWS = 8; // lights pooling on the paper, at the freshest landings
+const GLOW_POWER = 50; // candela, for a note of middling weight
+const GLOW_HEIGHT = 0.35; // over the print: how wide the pool spreads
+const GLOW_FADE = 2; // s for a pool to fade to a third, as newer landings take the lights
 
 export interface Landings {
 	/** On the paper: a ring of light spreading from each landing. */
 	ripples: THREE.Mesh;
 	/** Over everything: sparks thrown up by each landing, falling back and skidding out. */
 	sparks: THREE.Points;
+	/** Lights at the freshest landings, pooling their colour on the paper and catching the print's gloss. */
+	glows: THREE.Group;
+	setTime(t: number): void;
 	setViewHeight(px: number): void;
 }
 
@@ -28,7 +36,37 @@ export function createLandings(song: Prepared, looks: Look[], time: { value: num
 	const height = { value: 1 };
 	const sparks = new THREE.Points(sparkGeometry(song, looks), sparkMaterial(time, height));
 	ripples.frustumCulled = sparks.frustumCulled = false;
-	return { ripples, sparks, setViewHeight: (px) => void (height.value = px) };
+	const glows = createGlows(song, looks);
+	return { ripples, sparks, glows: glows.group, setTime: glows.setTime, setViewHeight: (px) => void (height.value = px) };
+}
+
+/** A fixed set of lights (so no shader ever recompiles) handed each frame to the freshest landings: a flash as heavy as
+ * the note, then a glow fading as the music moves on. */
+function createGlows({ flights }: Prepared, looks: Look[]) {
+	const landings = flights.map(([note, , land, , , x, y]) => ({ land, x, y, ...looks[note] })).sort((a, b) => a.land - b.land);
+	const lights = Array.from({ length: GLOWS }, () => new THREE.PointLight(0xffffff, 0, 0, 2));
+	const group = new THREE.Group().add(...lights);
+	return {
+		group,
+		setTime(t: number) {
+			let [lo, hi] = [0, landings.length];
+			while (lo < hi) {
+				const mid = (lo + hi) >> 1;
+				if (landings[mid].land <= t) lo = mid + 1;
+				else hi = mid;
+			}
+			lights.forEach((light, k) => {
+				const at = landings[lo - 1 - k];
+				const age = at ? t - at.land : Infinity;
+				light.intensity = 0;
+				if (age > 5 * GLOW_FADE) return;
+				const flash = 0.4 + 2.6 * Math.exp(-age / 0.15);
+				light.intensity = GLOW_POWER * (0.5 + at.weight) * flash * Math.exp(-age / GLOW_FADE);
+				light.position.set(at.x, at.y, INK + GLOW_HEIGHT);
+				light.color.copy(at.colour);
+			});
+		}
+	};
 }
 
 /** A square on the paper around each landing, as wide as its ring gets; the shader draws the ring in it. */
@@ -43,7 +81,7 @@ function rippleGeometry({ flights }: Prepared, looks: Look[]) {
 		const reach = RIPPLE_REACH * (0.5 + weight) + RIPPLE_WIDTH;
 		[[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([cx, cy], k) => {
 			const v = f * 4 + k;
-			position.set([x + cx * reach, y + cy * reach, INK + 0.002], v * 3);
+			position.set([x + cx * reach, y + cy * reach, ON_PAPER], v * 3);
 			corner.set([cx * reach, cy * reach], v * 2);
 			land[v] = t;
 			look.set([colour.r, colour.g, colour.b, weight], v * 4);
@@ -134,12 +172,12 @@ function sparkMaterial(time: { value: number }, height: { value: number }) {
 			attribute vec4 aLook;      // colour, shown
 			varying vec3 vColour;
 			const float LIFE = ${SPARK_LIFE.toFixed(4)}, SIZE = ${SPARK_SIZE.toFixed(4)}, GLOW = ${SPARK_GLOW.toFixed(4)};
-			const float GRAVITY = ${GRAVITY.toFixed(4)}, DRAG = ${DRAG.toFixed(4)}, LIFT = ${INK.toFixed(4)};
+			const float GRAVITY = ${GRAVITY.toFixed(4)}, DRAG = ${DRAG.toFixed(4)}, LIFT = ${INK.toFixed(4)}, FLOOR = ${ON_PAPER.toFixed(4)};
 			void main() {
 				float age = uTime - aStart.z;
 				float left = (age >= 0.0 && age < LIFE) ? (1.0 - age / LIFE) * aLook.w : 0.0;
 				vec2 slide = aVelocity.xy * (1.0 - exp(-DRAG * age)) / DRAG;
-				float z = max(LIFT + aVelocity.z * age - 0.5 * GRAVITY * age * age, LIFT);
+				float z = max(LIFT + aVelocity.z * age - 0.5 * GRAVITY * age * age, FLOOR);
 				vec4 view = viewMatrix * vec4(aStart.xy + slide, z, 1.0);
 				gl_Position = projectionMatrix * view;
 				// world size to pixels: the projection's focal length over the distance, times half the buffer height

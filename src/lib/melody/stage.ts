@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createLights, COLOUR, type Lights } from './lights';
 import { createPulse, noteLooks } from './looks';
 import { framingAt, INK, type Prepared } from './melody';
+import { createPaper } from './paper';
 import { scoreGeometry } from './score';
 
 /** Blender's 50 mm lens on its 36 mm sensor: the width it shows is what settings.SHOT was measured with. */
@@ -16,8 +17,7 @@ const BLOOM = 0.3;
 // how much the lamp and the glow swell as the music lands: the room breathes with it
 const LAMP_SWELL = 0.5; // share of LAMP_POWER
 const BLOOM_SWELL = 0.35;
-const PAPER = new THREE.Color(0.78, 0.75, 0.7);
-const INK_COLOUR = new THREE.Color(0.008, 0.008, 0.008);
+const INK_COLOUR = new THREE.Color(0.006, 0.006, 0.006);
 
 export interface Stage {
 	/** Shows a song: its score on the paper, its comets and heads. */
@@ -40,13 +40,10 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	camera.up.set(0, 0, 1);
 	const lamp = new THREE.PointLight(COLOUR, LAMP_POWER, 0, 2);
 	scene.add(lamp);
-	const paper = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.65 }));
-	const ink = new THREE.Mesh(
-		new THREE.BufferGeometry(),
-		new THREE.MeshStandardMaterial({ color: INK_COLOUR, roughness: 0.6, side: THREE.DoubleSide })
-	);
-	ink.position.z = INK;
-	scene.add(paper, ink);
+	const paper = createPaper(renderer.capabilities.getMaxAnisotropy());
+	// glossy, as printing ink dries: its chamfered edges catch the lamp and the glows
+	const ink = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: INK_COLOUR, roughness: 0.3 }));
+	scene.add(paper.mesh, ink);
 	const overlay = new THREE.Scene(); // the comets, after the depth of field
 	let song: Prepared | undefined;
 	let lights: Lights | undefined;
@@ -56,7 +53,7 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
 	const composer = new EffectComposer(renderer, target);
 	composer.addPass(new RenderPass(scene, camera));
-	const focus = new BokehPass(scene, camera, { focus: 30, aperture: 0.001, maxblur: 0.012 });
+	const focus = new BokehPass(scene, camera, { focus: 30, aperture: 0.0005, maxblur: 0.007 });
 	composer.addPass(focus);
 	const comets = new RenderPass(overlay, camera);
 	comets.clear = false;
@@ -106,11 +103,8 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		show(next, svg) {
 			song = next;
 			ink.geometry.dispose();
-			ink.geometry = scoreGeometry(svg);
-			// the paper reaches well past the score and behind it, into the dark (build.paper)
-			const length = next.page.box;
-			paper.scale.set(length + 120, 320, 1);
-			paper.position.set(length / 2, 80, 0);
+			ink.geometry = scoreGeometry(svg, INK);
+			paper.fit(next.page.box);
 			if (lights) {
 				scene.remove(lights.paper);
 				overlay.remove(lights.overlay);
@@ -127,10 +121,9 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 			renderer.setAnimationLoop(null);
 			observer.disconnect();
 			lights?.dispose();
-			for (const m of [paper, ink]) {
-				m.geometry.dispose();
-				m.material.dispose();
-			}
+			paper.dispose();
+			ink.geometry.dispose();
+			ink.material.dispose();
 			focus.dispose();
 			bloom.dispose();
 			composer.dispose();

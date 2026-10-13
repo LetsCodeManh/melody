@@ -1,5 +1,6 @@
-/** How far the print stands off the paper: settings.INK / settings.SPACE. */
-export const INK = 0.03;
+/** How high the raised print stands off the paper, in staff spaces: where heads glow and comets land. Live only: in
+ * Blender the print is flat, settings.INK / settings.SPACE = 0.03 off the paper. */
+export const INK = 0.1;
 
 /** A song as prepare.py writes it, in page units (staff spaces, y up) and seconds from the first note. */
 export interface Prepared {

@@ -47,12 +47,15 @@ export function createLights(song: Prepared, looks: Look[]): Lights {
 	comets.frustumCulled = heads.frustumCulled = false;
 	const landings = createLandings(song, looks, time);
 	const [paper, overlay] = [new THREE.Group(), new THREE.Group()];
-	paper.add(heads, landings.ripples);
+	paper.add(heads, landings.ripples, landings.glows);
 	overlay.add(comets, landings.sparks);
 	return {
 		paper,
 		overlay,
-		setTime: (t) => void (time.value = t),
+		setTime(t) {
+			time.value = t;
+			landings.setTime(t);
+		},
 		setViewHeight: landings.setViewHeight,
 		dispose() {
 			for (const m of [comets, heads, landings.ripples, landings.sparks]) {
