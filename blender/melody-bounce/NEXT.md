@@ -96,7 +96,28 @@ that head (live: cools to an ember and goes dark; Blender: stays lit, as its hea
 `TRAIL_WIDTH`, `BALL` in `lights.ts` and `lights.py`. Looked at by eye: live (headless Chrome, paused at fixed times)
 and Blender stills of All of Me; `check.py` 0 out of frame. Manh has not seen the ball on the page yet.
 
+## Tried and reverted: lights on layers (2026-10-13)
+Aim: lights that overlap (a lower voice's long lit tie under the other voice's comets and heads, Bach bar 1) easier to
+tell apart. Tried each voice of a staff on its own height (`score.layers`, heads, ties and comets lifted 1 staff space a
+voice): the lit heads floated off their printed notes and read as loose dots. Then only the comet arcs lifted: hardly
+visible. All reverted, nothing committed. Also stashed, not wanted for now: a stereo synth with each hand panned
+(`git stash list`, "layered stereo synth"); its README fix for the stale "Songs are private" line is worth keeping.
+
+## Done since: the score prints as the edition (2026-10-13, melody repo)
+- `756d420` a MIDI written in two tracks (Mutopia, MFiles) gets a staff per track, the lower the bass; other files
+  still split at middle C. Held notes off the beat tie over at the next beat (`8.~4`, was `4.~16`); a staff's higher
+  voice comes first (stems up); a voice rests visibly only where the staff is silent or for a breath under a beat.
+  Checked by eye against Mutopia's prints of Bach's Prelude in C and Chopin's Prelude Op. 28 No. 20
+  (`songs/chopin-prelude-op28-no20.mid`, untracked). Left: Mutopia's clef changes (ours stays treble with ledger
+  lines), slurs, dynamics, fermatas.
+- `497ba72` ledger lines as thin as the staff lines, redrawn as strokes in the SVG, so the page and Blender print them
+  as staff lines (lower, matte). `bc41cb8` Bach republished.
+- Parked, not wanted for now: notes rising by pitch (`git stash list`, "rising notes MVP": orbs on beams over the
+  heads, comets between them, live only). The score fix took away the overlap it was for.
+
 ## Next, in order
+0. **Guard the score:** a test of Bach's first bars against Mutopia's `.ly` (the real file is in git), and an
+   engrave-only script (`.ly` → page PDF) in this folder: check the PDF first whenever `score.py` or `midi.py` change.
 1. **Look:** the low-note framing on the page (Nocturne, from "every comet in frame" above).
 2. **Small:** after a GPU reset the freed meshes can't be re-uploaded, so a "reload the page" message would help.
 
