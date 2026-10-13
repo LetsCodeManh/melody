@@ -150,6 +150,7 @@
 			playback = undefined;
 			setPreparing(false);
 			span = { start: 0, end: 0 };
+			now = 0; // the stage's loop, which keeps it, stops with the clear
 			stage?.clear();
 			error = NO_SONGS;
 		} catch (e) {

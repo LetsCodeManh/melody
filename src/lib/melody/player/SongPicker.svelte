@@ -63,7 +63,7 @@
 					{/if}
 				</li>
 			{:else}
-				<li class="none">No song matches</li>
+				<li class="none">{songs.length ? 'No song matches' : 'No songs yet'}</li>
 			{/each}
 		</ul>
 		<button class="add" onclick={onAdd}>Add a song <span>.mid, or drop one on the page</span></button>
