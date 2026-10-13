@@ -2,7 +2,7 @@
 import sys
 
 HERE = '/Users/manh/Developer/personal-os/visual/blender/melody-bounce/'
-DEFAULT_SONG = HERE + 'build/korobeiniki-piano.json'
+DEFAULT_SONG = HERE + 'build/interstellar.json'
 FPS = 60
 SAMPLES = 16                # EEVEE samples per frame: looks the same as 64 here at a third of the time
 LEAD, TAIL = 1.0, 2.0       # s before the first note and after the last

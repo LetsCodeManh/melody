@@ -1,6 +1,6 @@
 # Everything that doesn't need Blender: engrave the score, find its heads, plan the flights, render the audio.
 # Writes build/<song>.json (+ .ly, .svg, .wav) for build.py to read inside Blender. Takes ~10 s plus the audio.
-#   python3 blender/melody-bounce/prepare.py blender/melody-bounce/songs/korobeiniki-piano.mid
+#   python3 blender/melody-bounce/prepare.py blender/melody-bounce/songs/<song>.mid
 import json, math, os, sys
 import flight, midi, score, settings, synth
 

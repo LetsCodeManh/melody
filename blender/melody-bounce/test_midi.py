@@ -46,11 +46,18 @@ class ParseTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             midi.parse(b'RIFF' + b'\x00' * 20)
 
-    def test_reads_the_bundled_song(self):
-        notes = midi.read(os.path.join(HERE, 'songs', 'korobeiniki.mid'))
-        self.assertGreater(len(notes), 30)
-        self.assertEqual(notes, sorted(notes, key=lambda n: (n.start, -n.pitch)))
-        self.assertTrue(all(n.end > n.start for n in notes))
+    def test_reads_the_songs_here(self):
+        # the songs are private and kept out of git, so this checks whichever are on this machine
+        folder = os.path.join(HERE, 'songs')
+        names = sorted(f for f in os.listdir(folder) if f.endswith('.mid')) if os.path.isdir(folder) else []
+        if not names:
+            self.skipTest('no songs in songs/')
+        for name in names:
+            with self.subTest(name):
+                notes = midi.read(os.path.join(folder, name))
+                self.assertGreater(len(notes), 30)
+                self.assertEqual(notes, sorted(notes, key=lambda n: (n.start, -n.pitch)))
+                self.assertTrue(all(n.end > n.start for n in notes))
 
 
 class MelodyTest(unittest.TestCase):

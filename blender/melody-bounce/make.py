@@ -1,7 +1,7 @@
 # Turns a MIDI file into the melody video without opening Blender: prepare, build and check the scene headless, save
 # build/<song>.blend, render, then check the sound lands on the first note and grab stills to look at.
-#   python3 blender/melody-bounce/make.py songs/korobeiniki-piano.mid          a 10 s preview at half size
-#   python3 blender/melody-bounce/make.py songs/korobeiniki-piano.mid --full   the whole song at 1080p (~50 min/min)
+#   python3 blender/melody-bounce/make.py songs/<song>.mid          a 10 s preview at half size
+#   python3 blender/melody-bounce/make.py songs/<song>.mid --full   the whole song at 1080p (~50 min/min)
 import json, os, re, subprocess, sys, time
 import prepare, settings
 
