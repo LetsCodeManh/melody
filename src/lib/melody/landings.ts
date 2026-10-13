@@ -4,7 +4,7 @@ import { INK, type Prepared } from './melody';
 
 // What a comet does to the page as it lands (lengths in staff spaces, times in s), heavier notes harder
 const ON_PAPER = 0.004; // just over the paper, under the raised print
-const RIPPLE_REACH = 2.2; // radius a ring spreads to, for a note of middling weight
+const RIPPLE_REACH = 2.2; // radius a ring spreads to, for a key struck middling hard
 const RIPPLE_WIDTH = 0.12;
 const RIPPLE_LIFE = 0.8;
 const RIPPLE_GLOW = 2.5;
@@ -82,7 +82,8 @@ export function poolShare(lands: number[], i: number, t: number) {
 	return count >= GLOWS ? 0 : Math.max(0, 1 - (newer / (GLOWS - 1)) ** 2);
 }
 
-/** A square on the paper around each landing, as wide as its ring gets; the shader draws the ring in it. */
+/** A square on the paper around each landing, as wide as its ring gets; the shader draws the ring in it. The harder
+ * the key is struck, the further the ring spreads. */
 function rippleGeometry({ flights }: Prepared, looks: Look[]) {
 	const position = new Float32Array(flights.length * 4 * 3);
 	const corner = new Float32Array(flights.length * 4 * 2);
@@ -90,14 +91,14 @@ function rippleGeometry({ flights }: Prepared, looks: Look[]) {
 	const look = new Float32Array(flights.length * 4 * 4);
 	const index: number[] = [];
 	flights.forEach(([note, , t, , , x, y], f) => {
-		const { colour, weight } = looks[note];
-		const reach = RIPPLE_REACH * (0.5 + weight) + RIPPLE_WIDTH;
+		const { colour, strike } = looks[note];
+		const reach = RIPPLE_REACH * (0.5 + strike) + RIPPLE_WIDTH;
 		[[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([cx, cy], k) => {
 			const v = f * 4 + k;
 			position.set([x + cx * reach, y + cy * reach, ON_PAPER], v * 3);
 			corner.set([cx * reach, cy * reach], v * 2);
 			land[v] = t;
-			look.set([colour.r, colour.g, colour.b, weight], v * 4);
+			look.set([colour.r, colour.g, colour.b, strike], v * 4);
 		});
 		index.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3);
 	});
@@ -130,7 +131,7 @@ function rippleMaterial(time: { value: number }) {
 			uniform float uTime;
 			varying vec2 vAt;
 			varying float vLand;
-			varying vec4 vLook;
+			varying vec4 vLook; // colour, strike
 			const float REACH = ${RIPPLE_REACH.toFixed(4)}, WIDTH = ${RIPPLE_WIDTH.toFixed(4)};
 			const float LIFE = ${RIPPLE_LIFE.toFixed(4)}, GLOW = ${RIPPLE_GLOW.toFixed(4)};
 			void main() {

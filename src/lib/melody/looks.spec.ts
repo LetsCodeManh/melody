@@ -18,6 +18,12 @@ describe('noteLooks', () => {
 		expect(short.weight).toBe(0.25);
 		expect(long.weight).toBe(0.75);
 	});
+	it('strikes by velocity alone, by weight when every key is struck alike', () => {
+		const [soft, hard] = noteLooks(song([[60, 30, 3], [60, 110, 0.1]]));
+		expect([soft.strike, hard.strike]).toEqual([0, 1]);
+		const [short, long] = noteLooks(song([[60, 50, 0.1], [60, 50, 3]]));
+		expect([short.strike, long.strike]).toEqual([short.weight, long.weight]);
+	});
 });
 
 describe('createPulse', () => {

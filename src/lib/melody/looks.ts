@@ -10,6 +10,9 @@ export interface Look {
 	colour: THREE.Color;
 	/** 0 lightest to 1 heaviest: how hard the note lands, from its loudness and length within the song */
 	weight: number;
+	/** 0 softest to 1 hardest: how hard the key is struck within the song, from velocity alone; the weight when every
+	 * key is struck alike */
+	strike: number;
 }
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
@@ -33,7 +36,9 @@ export function noteLooks({ notes }: Prepared): Look[] {
 		const loudness = loud > quiet ? (velocity - quiet) / (loud - quiet) : 0.5;
 		// an eighth of a second or shorter lands lightest, two seconds or longer heaviest
 		const longness = clamp01(Math.log2(length / 0.125) / 4);
-		return { colour: along(hi > lo ? clamp01((pitch - lo) / (hi - lo)) : 0.5), weight: (loudness + longness) / 2 };
+		const weight = (loudness + longness) / 2;
+		const colour = along(hi > lo ? clamp01((pitch - lo) / (hi - lo)) : 0.5);
+		return { colour, weight, strike: loud > quiet ? loudness : weight };
 	});
 }
 
