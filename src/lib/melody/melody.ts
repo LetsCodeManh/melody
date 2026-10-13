@@ -10,6 +10,8 @@ export interface Prepared {
 	flights: [number, number, number, number, number, number, number][];
 	/** note, time, x, y: the heads a note is tied on to, lit when the music reaches them */
 	held: [number, number, number, number][];
+	/** note, start, end, then the four points of the tie's Bezier from its left end: a glint glides along it */
+	ties: [number, number, number, number, number, number, number, number, number, number, number][];
 	/** per note, by the index flights and held refer to: MIDI pitch, velocity (1-127), length in s */
 	notes: [number, number, number][];
 	/** one sample per frame from -lead: the page x looked at, and how far back the camera stands (1 = nearest) */

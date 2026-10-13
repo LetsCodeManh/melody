@@ -34,12 +34,27 @@ class FlightsTest(unittest.TestCase):
         self.assertEqual(f.origin, (far[6][0] + flight.ENTRY[0], far[6][1] + flight.ENTRY[1]))
         self.assertEqual(f.launch, 2.0 - flight.MAX_FLIGHT)
 
-    def test_held_heads_are_flown_to_along_the_tie_unless_reached_at_once(self):
+    def test_a_glint_glides_along_each_tie_unless_the_head_is_reached_at_once(self):
         # note 2 (bass, 0-2 s) rings on to a head reached as it's struck, then one at 1.5 s, then one right after
-        held = [(2, 1.52, 9.0, 1.0), (2, 1.5, 8.0, 1.0), (2, 0.0, 2.5, 1.0)]
-        flown, still = flight.ties(list(self.flights.values()), held)
-        self.assertEqual(flown, [flight.Flight(2, 1.5 - flight.MAX_FLIGHT, 1.5, (2.5, 1.0), (8.0, 1.0))])
-        self.assertEqual(still, [(2, 0.0, 2.5, 1.0), (2, 1.52, 9.0, 1.0)])
+        held = [(2, 1.52, 9.0, 1.0), (2, 1.5, 8.0, 1.0), (2, 0.0, 4.0, 1.0)]
+        tie = ((5.0, 0.4), (6.0, 0.0), (7.0, 0.0), (7.8, 0.4))  # from the head at 4 to the one at 8, under them
+        curves = [((2.5, 1.6), (3.0, 1.9), (3.5, 1.9), (3.8, 1.6)), tie, ((8.5, 0.4), (8.6, 0.3), (8.7, 0.3), (8.8, 0.4))]
+        framed, glides = flight.ties(list(self.flights.values()), held, curves)
+        self.assertEqual(framed, [flight.Flight(2, 0.0, 1.5, (4.0, 1.0), (8.0, 1.0))])
+        self.assertEqual(glides, [flight.Glide(2, 0.0, 1.5, tie)])
+
+    def test_each_tied_note_of_a_chord_glides_along_its_own_tie(self):
+        # notes 0 and 1 (a chord at 0 s) each ring on to a head at 0.4 s; their ties bow out, below and above
+        held = [(0, 0.4, 5.0, 7.0), (1, 0.4, 5.0, 11.0)]
+        low, high = ((1.0, 6.5), (2.0, 6.0), (3.0, 6.0), (4.8, 6.5)), ((2.0, 11.5), (3.0, 12.0), (4.0, 12.0), (4.8, 11.5))
+        _, glides = flight.ties(list(self.flights.values()), held, [high, low])
+        self.assertEqual([(g.note, g.curve) for g in glides], [(0, low), (1, high)])
+
+    def test_bezier_runs_from_the_first_point_to_the_last(self):
+        curve = ((0.0, 0.0), (1.0, 2.0), (3.0, 2.0), (4.0, 0.0))
+        self.assertEqual(flight.bezier(curve, 0), (0.0, 0.0))
+        self.assertEqual(flight.bezier(curve, 1), (4.0, 0.0))
+        self.assertEqual(flight.bezier(curve, 0.5), (2.0, 1.5))
 
     def test_arc_starts_and_ends_on_the_page(self):
         f = self.flights[3]

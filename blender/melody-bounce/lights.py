@@ -1,5 +1,6 @@
 # The lights: a comet per note that flies along its arc and lands on the note's head, and the head lighting up and
-# staying lit. Each comet is a curve whose visible stretch (bevel start/end) is keyframed, so no handlers are needed.
+# staying lit; a tied note ringing on, a glint gliding along its tie to the head it is held on to. Each comet and glint
+# is a curve whose visible stretch (bevel start/end) is keyframed, so no handlers are needed.
 import bpy, math
 import flight
 
@@ -11,7 +12,10 @@ DRAIN = 0.12            # s for the tail to run into the head after landing
 POINTS = 32             # per arc
 FLASH, SUSTAIN = 20.0, 3.0  # head glow at the hit, and after it settles
 SETTLE = 0.35           # s
-RISE = 0.1              # s for a held head (a tied note ringing on) to come up to SUSTAIN, with no flash
+FILL = 0.15             # s for a held head (a tied note ringing on) to come up to SUSTAIN once reached, with no flash
+GLIDE_GLOW = 8.0
+GLIDE_WIDTH = 0.05      # staff spaces
+GLINT = 0.25            # share of the tie the glint covers
 HEAD_RADII = (0.66, 0.47)   # staff spaces: a black notehead
 HEAD_TILT = math.radians(20)
 
@@ -69,9 +73,9 @@ def head_mesh(space):
     return mesh
 
 
-def build(col, flights, held, space, lift, frame, bake):
-    """flights: flight.Flight in page units; held: (note, time, x, y) for heads a note rings on to; space: metres per
-    staff space; lift: z of the ink's top; frame(t) maps song seconds to frames; bake(id, path, index, frames, values)
+def build(col, flights, held, glides, space, lift, frame, bake):
+    """flights: flight.Flight in page units; held: (note, time, x, y) for heads a note rings on to; glides:
+    flight.Glide along the ties to them; space: metres per staff space; lift: z of the ink's top; frame(t) maps song seconds to frames; bake(id, path, index, frames, values)
     keyframes in bulk."""
     taper_ob = taper()
     col.objects.link(taper_ob)
@@ -110,4 +114,25 @@ def build(col, flights, held, space, lift, frame, bake):
         col.objects.link(head)
         head.location = (x * space, y * space, lift + 0.0002)
         head['glow'] = 0.0
-        bake(head, '["glow"]', 0, [frame(t - RISE), frame(t)], [0.0, SUSTAIN])
+        bake(head, '["glow"]', 0, [frame(t), frame(t + FILL)], [0.0, SUSTAIN])
+
+    glint = emission_material('Glint', COMET_COLOUR, GLIDE_GLOW)
+    for i, g in enumerate(glides):
+        cu = bpy.data.curves.new(f'Glint.{i:03d}', 'CURVE')
+        cu.dimensions = '3D'
+        cu.bevel_depth, cu.bevel_resolution = GLIDE_WIDTH * space, 2
+        cu.taper_object, cu.use_map_taper = taper_ob, True
+        cu.bevel_factor_mapping_start = cu.bevel_factor_mapping_end = 'SPLINE'
+        sp = cu.splines.new('POLY')
+        sp.points.add(POINTS - 1)
+        for k, p in enumerate(sp.points):
+            px, py = flight.bezier(g.curve, k / (POINTS - 1))
+            p.co = (px * space, py * space, lift + 0.0002, 1)
+        cu.materials.append(glint)
+        ob = bpy.data.objects.new(cu.name, cu)
+        col.objects.link(ob)
+        start, end = frame(g.start), frame(g.end)
+        drained = end + DRAIN * (frame(1) - frame(0))
+        # the glint keeps GLINT of the tie behind it: it sets off from nothing, and runs into the head at the end
+        bake(cu, 'bevel_factor_end', 0, [start, end], [0.0, 1.0])
+        bake(cu, 'bevel_factor_start', 0, [start, start + GLINT * (end - start), end, drained], [0.0, 0.0, 1 - GLINT, 1.0])

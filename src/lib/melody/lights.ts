@@ -4,7 +4,7 @@ import type { Look } from './looks';
 import { INK, type Prepared } from './melody';
 
 // The look of blender/melody-bounce/lights.py (lengths in staff spaces, times in s), live only: coloured by pitch,
-// sized by weight, tails by speed, heads cooling to embers and going dark
+// sized by weight, tails by speed, heads cooling to embers and going dark, held heads filling from their tie's side
 const COMET_GLOW = 14;
 const COMET_WIDTH = 0.15; // bevel radius at the comet's head, for a note of middling weight
 // the hot white at a fresh head's centre, and a touch of it in the comets
@@ -19,7 +19,10 @@ const SETTLE = 0.35;
 const EMBER = 2.5; // what a lit head cools to, so the music just played stands out from what came before
 const COOL = 4; // s for a head to cool most of the way from SUSTAIN to EMBER
 const DARK = 8; // s for the ember to fade back to ink once it has cooled, as a light losing its power
-const RISE = 0.1; // for a held head (a tied note ringing on) to come up to SUSTAIN, with no flash
+const FILL = 0.15; // for a held head (a tied note ringing on) to fill up to SUSTAIN once reached, with no flash
+const GLIDE_GLOW = 6; // the glint gliding along a tie: dimmer and thinner than a comet, flat on the ink
+const GLIDE_WIDTH = 0.06;
+const GLINT = 0.25; // share of the tie the glint covers
 const HEAD_RADII = [0.66, 0.47];
 const HEAD_TILT = THREE.MathUtils.degToRad(20);
 
@@ -46,12 +49,13 @@ export function createLights(song: Prepared, looks: Look[]): Lights {
 	const time = { value: -Infinity };
 	const comets = new THREE.Mesh(cometGeometry(song, looks), cometMaterial(song, time));
 	const heads = new THREE.Mesh(headGeometry(song, looks), headMaterial(song, time));
+	const glints = new THREE.Mesh(glintGeometry(song, looks), glintMaterial(time));
 	// their vertices move in the shaders, so their bounds mean nothing
-	comets.frustumCulled = heads.frustumCulled = false;
+	comets.frustumCulled = heads.frustumCulled = glints.frustumCulled = false;
 	const landings = createLandings(song, looks, time);
 	const [paper, overlay] = [new THREE.Group(), new THREE.Group()];
 	paper.add(heads, landings.ripples, landings.glows);
-	overlay.add(comets, landings.sparks);
+	overlay.add(comets, glints, landings.sparks);
 	return {
 		paper,
 		overlay,
@@ -61,7 +65,7 @@ export function createLights(song: Prepared, looks: Look[]): Lights {
 		},
 		setViewHeight: landings.setViewHeight,
 		dispose() {
-			for (const m of [comets, heads, landings.ripples, landings.sparks]) {
+			for (const m of [comets, heads, glints, landings.ripples, landings.sparks]) {
 				m.geometry.dispose();
 				(m.material as THREE.Material).dispose();
 			}
@@ -121,8 +125,7 @@ function cometMaterial({ settings }: Prepared, time: { value: number }) {
 			const float WIDTH = ${COMET_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${COMET_GLOW.toFixed(4)};
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 
-			// thin at the tail, full near the head (lights.taper)
-			float taper(float s) { return s < 0.85 ? mix(0.05, 1.0, s / 0.85) : mix(1.0, 0.7, (s - 0.85) / 0.15); }
+			${TAPER}
 
 			void main() {
 				float launch = aTimes.x, land = aTimes.y;
@@ -152,6 +155,94 @@ function cometMaterial({ settings }: Prepared, time: { value: number }) {
 	});
 }
 
+// thin at the tail, full near the head (lights.taper)
+const TAPER = /* glsl */ `float taper(float s) { return s < 0.85 ? mix(0.05, 1.0, s / 0.85) : mix(1.0, 0.7, (s - 0.85) / 0.15); }`;
+
+/** Each glint: a short comet lying on its tie, RINGS rings of SIDES vertices like the comets'; the shader places them
+ * on the tie's curve for the current time. It sets off as the music reaches the tied note's earlier head and reaches
+ * the later one as the music does, then runs into it. */
+function glintGeometry({ ties }: Prepared, looks: Look[]) {
+	const per = RINGS * SIDES;
+	const from = new Float32Array(ties.length * per * 4);
+	const to = new Float32Array(ties.length * per * 4);
+	const times = new Float32Array(ties.length * per * 2);
+	const ring = new Float32Array(ties.length * per * 2);
+	const look = new Float32Array(ties.length * per * 4);
+	const index: number[] = [];
+	ties.forEach(([note, start, end, x0, y0, x1, y1, x2, y2, x3, y3], f) => {
+		const { colour, weight } = looks[note];
+		for (let r = 0; r < RINGS; r++)
+			for (let k = 0; k < SIDES; k++) {
+				const v = f * per + r * SIDES + k;
+				from.set([x0, y0, x1, y1], v * 4);
+				to.set([x2, y2, x3, y3], v * 4);
+				times.set([start, end], v * 2);
+				ring.set([r / (RINGS - 1), (2 * Math.PI * k) / SIDES], v * 2);
+				look.set([colour.r, colour.g, colour.b, weight], v * 4);
+				if (r < RINGS - 1) {
+					const next = f * per + r * SIDES + ((k + 1) % SIDES);
+					index.push(v, next, v + SIDES, next, next + SIDES, v + SIDES);
+				}
+			}
+	});
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ties.length * per * 3), 3));
+	g.setAttribute('aFrom', new THREE.BufferAttribute(from, 4));
+	g.setAttribute('aTo', new THREE.BufferAttribute(to, 4));
+	g.setAttribute('aTimes', new THREE.BufferAttribute(times, 2));
+	g.setAttribute('aRing', new THREE.BufferAttribute(ring, 2));
+	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
+	g.setIndex(index);
+	return g;
+}
+
+function glintMaterial(time: { value: number }) {
+	return new THREE.ShaderMaterial({
+		uniforms: { uTime: time },
+		vertexShader: /* glsl */ `
+			uniform float uTime;
+			attribute vec4 aFrom;   // the tie's first two Bezier points
+			attribute vec4 aTo;     // its last two
+			attribute vec2 aTimes;  // start, end
+			attribute vec2 aRing;   // place along the visible stretch, angle around it
+			attribute vec4 aLook;   // colour, weight
+			varying vec3 vColour;
+			const float GLINT = ${GLINT.toFixed(4)}, DRAIN = ${DRAIN.toFixed(4)};
+			const float WIDTH = ${GLIDE_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${GLIDE_GLOW.toFixed(4)};
+			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
+			${TAPER}
+
+			vec2 bezier(float u) {
+				float v = 1.0 - u;
+				return v * v * v * aFrom.xy + 3.0 * u * v * v * aFrom.zw + 3.0 * u * u * v * aTo.xy + u * u * u * aTo.zw;
+			}
+			vec2 slope(float u) {
+				float v = 1.0 - u;
+				return 3.0 * v * v * (aFrom.zw - aFrom.xy) + 6.0 * u * v * (aTo.xy - aFrom.zw) + 3.0 * u * u * (aTo.zw - aTo.xy);
+			}
+
+			void main() {
+				float start = aTimes.x, end = aTimes.y;
+				// the visible stretch of the tie, as the comets': GLINT of it behind the glint, draining at the end
+				float head = clamp((uTime - start) / (end - start), 0.0, 1.0);
+				float tail = uTime < end ? max(head - GLINT, 0.0) : mix(1.0 - GLINT, 1.0, clamp((uTime - end) / DRAIN, 0.0, 1.0));
+				float shown = step(start, uTime) * step(tail + 1e-4, head);
+				float u = mix(tail, head, aRing.x);
+				vec3 tangent = normalize(vec3(slope(u), 0.0) + vec3(1e-6, 0.0, 0.0));
+				vec3 side = normalize(cross(tangent, vec3(0.0, 0.0, 1.0)));
+				vec3 up = cross(side, tangent);
+				float radius = WIDTH * (0.7 + 0.6 * aLook.w) * taper(aRing.x) * shown;
+				vec3 p = vec3(bezier(u), LIFT) + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
+				vColour = mix(aLook.rgb, CORE, ${CORE_SHARE.toFixed(4)}) * GLOW;
+				gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+			}`,
+		fragmentShader: /* glsl */ `
+			varying vec3 vColour;
+			void main() { gl_FragColor = vec4(vColour, 1.0); }`,
+		depthTest: false
+	});
+}
+
 /** A tilted ellipse over each printed head: struck ones carry the time their comet lands, held ones (a tied note
  * ringing on) the time the music reaches them. */
 function headGeometry({ flights, held }: Prepared, looks: Look[]) {
@@ -164,6 +255,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 	const hit = new Float32Array(heads.length * per);
 	const struck = new Float32Array(heads.length * per);
 	const rim = new Float32Array(heads.length * per); // 0 at the centre vertex, 1 round the edge
+	const across = new Float32Array(heads.length * per); // along the head's long axis, -1 at its left end to 1
 	const look = new Float32Array(heads.length * per * 4);
 	const index: number[] = [];
 	const [rx, ry] = HEAD_RADII;
@@ -175,6 +267,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 			const a = (2 * Math.PI * i) / HEAD_SEGMENTS;
 			const [x, y] = [rx * Math.cos(a), ry * Math.sin(a)];
 			position.set([tx + x * cos - y * sin, ty + x * sin + y * cos, INK + 0.004], (first + 1 + i) * 3);
+			across[first + 1 + i] = Math.cos(a);
 			index.push(first, first + 1 + i, first + 1 + ((i + 1) % HEAD_SEGMENTS));
 		}
 		hit.fill(land, first, first + per);
@@ -188,6 +281,7 @@ function headGeometry({ flights, held }: Prepared, looks: Look[]) {
 	g.setAttribute('aHit', new THREE.BufferAttribute(hit, 1));
 	g.setAttribute('aStruck', new THREE.BufferAttribute(struck, 1));
 	g.setAttribute('aRim', new THREE.BufferAttribute(rim, 1));
+	g.setAttribute('aAcross', new THREE.BufferAttribute(across, 1));
 	g.setAttribute('aLook', new THREE.BufferAttribute(look, 4));
 	g.setIndex(index);
 	return g;
@@ -197,12 +291,13 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 	return new THREE.ShaderMaterial({
 		uniforms: { uTime: time, uFrame: { value: 1 / settings.fps } },
 		vertexShader: /* glsl */ `
-			attribute float aHit, aStruck, aRim;
+			attribute float aHit, aStruck, aRim, aAcross;
 			attribute vec4 aLook;
-			varying float vHit, vStruck, vRim;
+			varying float vHit, vStruck, vRim, vAcross;
 			varying vec4 vLook;
 			void main() {
 				vRim = aRim;
+				vAcross = aAcross;
 				vHit = aHit;
 				vStruck = aStruck;
 				vLook = aLook;
@@ -210,21 +305,23 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 			}`,
 		fragmentShader: /* glsl */ `
 			uniform float uTime, uFrame;
-			varying float vHit, vStruck, vRim;
+			varying float vHit, vStruck, vRim, vAcross;
 			varying vec4 vLook;
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			const float FLASH = ${FLASH.toFixed(4)}, SUSTAIN = ${SUSTAIN.toFixed(4)}, SETTLE = ${SETTLE.toFixed(4)};
-			const float RISE = ${RISE.toFixed(4)}, EMBER = ${EMBER.toFixed(4)}, COOL = ${COOL.toFixed(4)};
+			const float FILL = ${FILL.toFixed(4)}, EMBER = ${EMBER.toFixed(4)}, COOL = ${COOL.toFixed(4)};
 			const float DARK = ${DARK.toFixed(4)};
 			void main() {
 				// the glow keys in lights.py, then cooling. Struck: dark until a frame before the hit, a flash as heavy
-				// as the note, settling to a steady glow. Held: rising to the steady glow as the music reaches it. Both
-				// then cool to an ember and fade back to ink.
+				// as the note, settling to a steady glow. Held: once the music reaches it, filling with the steady glow
+				// from its left, the side its tie comes in, as the glint gliding along runs into it. Both then cool to
+				// an ember and fade back to ink.
 				float t = uTime - vHit;
 				float flash = FLASH * (0.5 + vLook.w);
 				float steady = mix(SUSTAIN, EMBER, 1.0 - exp(-max(t - SETTLE, 0.0) / COOL));
 				steady *= 1.0 - smoothstep(SETTLE + COOL, SETTLE + COOL + DARK, t);
-				float glow = vStruck < 0.5 ? steady * clamp((t + RISE) / RISE, 0.0, 1.0)
+				float front = mix(-1.3, 1.3, clamp(t / FILL, 0.0, 1.0));
+				float glow = vStruck < 0.5 ? steady * (1.0 - smoothstep(front - 0.3, front + 0.3, vAcross))
 					: t < -uFrame ? 0.0
 					: t < 0.0 ? flash * (t + uFrame) / uFrame
 					: t < SETTLE ? mix(flash, SUSTAIN, t / SETTLE)

@@ -22,14 +22,14 @@ def prepare(path):
     # a held head lights when the music reaches it, never outside its own note
     reach = flight.reached(flights, [h.x for h in held])
     held_at = [(h.note, min(max(t, song.notes[h.note].start), song.notes[h.note].end), h.x, -h.y) for h, t in zip(held, reach)]
-    tied, held_at = flight.ties(flights, held_at)
-    flights = sorted(flights + tied, key=lambda f: (f.land, f.note))
+    curves = [tuple((x, -y) for x, y in c) for c in score.ties(svg)]
+    tied, glides = flight.ties(flights, held_at, curves)
     synth.render(song.notes, out + '.wav')
     width, height, box = score.page(svg)
     end = max(n.end for n in song.notes)
     s = settings
     times = [i / s.FPS - s.LEAD for i in range(int(math.ceil(1 + (s.LEAD + end + s.TAIL) * s.FPS)))]
-    centre, back = flight.framing(flights, times, s.SHOT, s.SHOT_MIDDLE, s.MARGIN, s.LINGER, s.SMOOTH * s.FPS,
+    centre, back = flight.framing(flights + tied, times, s.SHOT, s.SHOT_MIDDLE, s.MARGIN, s.LINGER, s.SMOOTH * s.FPS,
                                    s.CAMERA, s.VIEW, s.STAFF_MID)
     data = {
         'svg': score.importable(svg, out + '.blender.svg'), 'score': svg, 'wav': out + '.wav',
@@ -41,6 +41,7 @@ def prepare(path):
                      'arc': flight.ARC, 'maxArc': flight.MAX_ARC},
         'flights': [[f.note, f.launch, f.land, *f.origin, *f.target] for f in flights],
         'held': [list(h) for h in held_at],
+        'ties': [[g.note, g.start, g.end, *(v for p in g.curve for v in p)] for g in glides],
         'notes': [[n.pitch, n.velocity, round(n.end - n.start, 4)] for n in song.notes],
     }
     with open(out + '.json', 'w') as f:

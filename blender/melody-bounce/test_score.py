@@ -103,6 +103,18 @@ class PrintedTest(unittest.TestCase):
         self.assertEqual([h.x for h in held], [20.0 + score.HEAD_HALF, 30.0 + score.HEAD_HALF])
 
 
+    def test_a_tie_is_read_as_the_curve_along_the_middle_of_its_crescent(self):
+        # as LilyPond prints one: the upper edge left to right, then the lower edge back
+        tie = ('<g transform="translate(100.0, 10.0)"><path stroke-width="0.0800" fill="currentColor" '
+               'd="M1.0000 0.8000C2.0000 0.2000 3.0000 0.2000 4.0000 0.8000L4.0000 0.8000C3.0000 0.4000 2.0000 0.4000 '
+               '1.0000 0.8000z"/></g>')
+        with tempfile.TemporaryDirectory() as folder:
+            svg = os.path.join(folder, 's.svg')
+            with open(svg, 'w') as f:
+                f.write('<a xlink:href="textedit:///s.ly:7:9:10">' + tie + '</a>')
+            self.assertEqual(score.ties(svg), [((101.0, 10.8), (102.0, 10.3), (103.0, 10.3), (104.0, 10.8))])
+
+
 @unittest.skipUnless(shutil.which('lilypond'), 'needs LilyPond')
 class EngraveTest(unittest.TestCase):
     def test_every_note_gets_a_head_at_its_place(self):

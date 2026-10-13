@@ -7,7 +7,7 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ params }) => {
 	if (!import.meta.env.DEV) error(404, 'Not found');
 	const data = await preparedForRequest(params.song);
-	const song: Prepared = { page: data.page, end: data.end, flights: data.flights, held: data.held, notes: data.notes, camera: data.camera, settings: data.settings };
+	const song: Prepared = { page: data.page, end: data.end, flights: data.flights, held: data.held, ties: data.ties, notes: data.notes, camera: data.camera, settings: data.settings };
 	return json(song);
 };
 

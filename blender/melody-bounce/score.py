@@ -247,6 +247,26 @@ def held_heads(svg, source):
             out.append(Head(note, x, y))
     return out
 
+NUMBER = r'([-\d.]+)'
+# a tie, printed as a filled crescent: its upper edge from the left end to the right, then its lower edge back
+TIE = re.compile(r'<g transform="translate\(\s*' + NUMBER + r'[ ,]+' + NUMBER + r'\s*\)">\s*<path [^>]*?d="M' + ' '.join([NUMBER] * 2)
+                 + 'C' + ' '.join([NUMBER] * 6) + 'L' + ' '.join([NUMBER] * 2) + 'C' + ' '.join([NUMBER] * 6) + 'z"')
+
+
+def ties(svg):
+    """Every tie printed, as the cubic Bezier along the middle of its crescent: four (x, y) from its left end; SVG
+    units, y down."""
+    with open(svg) as f:
+        text = f.read()
+    out = []
+    for m in TIE.finditer(text):
+        dx, dy, x0, y0, a1, b1, a2, b2, x3, y3, _, _, c1, d1, c2, d2, _, _ = map(float, m.groups())
+        # the lower edge runs back, so its second control point pairs with the upper edge's first
+        out.append(((dx + x0, dy + y0), (dx + (a1 + c2) / 2, dy + (b1 + d2) / 2), (dx + (a2 + c1) / 2, dy + (b2 + d1) / 2),
+                    (dx + x3, dy + y3)))
+    return out
+
+
 STAFF_LINE = 'staff-line'  # the importer names each object after its id, adding .001, .002, ...
 LINE = re.compile(r'<line [^>]*?stroke-width="([\d.]+)"[^>]*?x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/>')
 
