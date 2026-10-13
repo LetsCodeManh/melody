@@ -17,6 +17,9 @@ const HORIZONTAL_FOV = 2 * Math.atan(18 / 50);
 const FILL = new THREE.Color(0.9, 0.92, 1.0);
 const FILL_POWER = 30; // candela
 const FILL_AT = new THREE.Vector3(-3, 0, 10); // from the point looked at
+// as the camera backs off, the fill rises (its pool widens) by this power of how far back: part way, so a wide shot
+// shows more of the score lit while the dark still closes in round it
+const FILL_SPREAD = 0.6;
 const BLOOM = 0.25;
 // how much the fill and the glow swell as the music lands: the room breathes with it
 const FILL_SWELL = 0.4; // share of FILL_POWER
@@ -95,9 +98,11 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 		camera.position.set(centre, settings.staffMid, 0).add(offset);
 		camera.lookAt(centre, settings.staffMid, 0);
 		(focus.uniforms as { focus: { value: number } }).focus.value = offset.length();
-		fill.position.set(centre, settings.staffMid, 0).add(FILL_AT);
+		const spread = back ** FILL_SPREAD;
+		fill.position.set(centre, settings.staffMid, 0).addScaledVector(FILL_AT, spread);
 		const swell = pulse(t);
-		fill.intensity = FILL_POWER * (1 + FILL_SWELL * swell);
+		// spread squared: as bright where it falls straight down, however high it rises
+		fill.intensity = FILL_POWER * spread * spread * (1 + FILL_SWELL * swell);
 		bloom.strength = BLOOM + BLOOM_SWELL * swell;
 		lights.setTime(t);
 		composer.render();
