@@ -64,11 +64,12 @@ export function createStage(host: HTMLElement, time: () => number): Stage {
 	let lights: Lights | undefined;
 	let pulse = (_t: number) => 0;
 
-	// MSAA where the scene is drawn: the staff lines are thin. Only there: the composer's second buffer, a clone, gets
-	// the glowing comets and full-screen passes, which don't need it, and at retina size each MSAA buffer is ~350 MB
-	const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+	// MSAA where the scene is drawn: the staff lines are thin. Only there: the composer's other buffer gets the glowing
+	// comets and full-screen passes, which don't need it, and at retina size each MSAA buffer is ~350 MB; the bloom
+	// blending into one costs 5 ms a frame. The first pass draws into the read buffer (its clone of the target).
+	const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
 	const composer = new EffectComposer(renderer, target);
-	composer.renderTarget2.samples = 0;
+	composer.readBuffer.samples = 4;
 	composer.addPass(new RenderPass(scene, camera));
 	const focus = new BokehPass(scene, camera, { focus: 30, aperture: 0.00025, maxblur: 0.004 });
 	composer.addPass(focus);
