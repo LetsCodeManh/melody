@@ -20,7 +20,9 @@ def prepare(path):
     held = score.held_heads(svg, mapped)
     # a held head lights when the music reaches it, never outside its own note
     reach = flight.reached(flights, [h.x for h in held])
-    held_at = [(h, min(max(t, song.notes[h.note].start), song.notes[h.note].end)) for h, t in zip(held, reach)]
+    held_at = [(h.note, min(max(t, song.notes[h.note].start), song.notes[h.note].end), h.x, -h.y) for h, t in zip(held, reach)]
+    tied, held_at = flight.ties(flights, held_at)
+    flights = sorted(flights + tied, key=lambda f: (f.land, f.note))
     synth.render(song.notes, out + '.wav')
     width, height, box = score.page(svg)
     end = max(n.end for n in song.notes)
@@ -36,7 +38,7 @@ def prepare(path):
         'settings': {'fps': s.FPS, 'lead': s.LEAD, 'staffMid': s.STAFF_MID, 'camera': s.CAMERA, 'lamp': s.LAMP,
                      'arc': flight.ARC, 'maxArc': flight.MAX_ARC},
         'flights': [[f.note, f.launch, f.land, *f.origin, *f.target] for f in flights],
-        'held': [[h.note, t, h.x, -h.y] for h, t in held_at],
+        'held': [list(h) for h in held_at],
         'notes': [[n.pitch, n.velocity, round(n.end - n.start, 4)] for n in song.notes],
     }
     with open(out + '.json', 'w') as f:

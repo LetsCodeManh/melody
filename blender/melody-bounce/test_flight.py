@@ -34,6 +34,13 @@ class FlightsTest(unittest.TestCase):
         self.assertEqual(f.origin, (far[6][0] + flight.ENTRY[0], far[6][1] + flight.ENTRY[1]))
         self.assertEqual(f.launch, 2.0 - flight.MAX_FLIGHT)
 
+    def test_held_heads_are_flown_to_along_the_tie_unless_reached_at_once(self):
+        # note 2 (bass, 0-2 s) rings on to a head reached as it's struck, then one at 1.5 s, then one right after
+        held = [(2, 1.52, 9.0, 1.0), (2, 1.5, 8.0, 1.0), (2, 0.0, 2.5, 1.0)]
+        flown, still = flight.ties(list(self.flights.values()), held)
+        self.assertEqual(flown, [flight.Flight(2, 1.5 - flight.MAX_FLIGHT, 1.5, (2.5, 1.0), (8.0, 1.0))])
+        self.assertEqual(still, [(2, 0.0, 2.5, 1.0), (2, 1.52, 9.0, 1.0)])
+
     def test_arc_starts_and_ends_on_the_page(self):
         f = self.flights[3]
         self.assertEqual(flight.arc(f, 0), (*f.origin, 0))

@@ -9,6 +9,7 @@ MAX_FLIGHT = 0.45   # s: a comet waits on its origin through long notes, then ta
 ARC = 0.35          # arc height as a share of the distance flown
 MAX_ARC = 4.0       # staff spaces
 ENTRY = (-12.0, 6.0)  # where the first comets of each staff come from, relative to their target
+TIE_GAP = 0.05      # s: a held head the music reaches sooner than this after the note's previous head just lights with it
 FARTHEST = 15.0     # staff spaces: a comet from farther back (after a long rest) would pull the camera far out, so it
                     # flies in from ENTRY like a first note; about what the nearest shot shows
 
@@ -35,6 +36,22 @@ def flights(song, staves, heads):
                 out.append(Flight(n, launch, land, origin, target))
             before = notes
     return sorted(out, key=lambda f: (f.land, f.note))
+
+
+def ties(flights_, held):
+    """held: (note, time, x, y), page coordinates, for the heads a note rings on to (ties, heads past a barline). A comet
+    for each, flying along from the note's previous head and landing as the music reaches it, so every head that lights
+    is flown to. Returns (those flights, the held heads reached too soon after the previous one to fly to)."""
+    last = {f.note: (f.land, f.target) for f in flights_}
+    out, still = [], []
+    for note, t, x, y in sorted(held, key=lambda h: (h[0], h[1], h[2])):
+        before, origin = last[note]
+        if t - before < TIE_GAP:
+            still.append((note, t, x, y))
+        else:
+            out.append(Flight(note, max(before, t - MAX_FLIGHT), t, origin, (x, y)))
+        last[note] = (t, (x, y))
+    return out, still
 
 
 def arc(flight, u):
