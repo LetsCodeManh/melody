@@ -1,6 +1,16 @@
 build/
 renders/
 __pycache__/
-# your MIDI files stay out of the repo (most songs are under copyright); only the public-domain demo ships
+# your MIDI files stay out of the repo (most songs are under copyright); only the public-domain songs the site plays ship
 songs/*
+!songs/bach-invention-4.mid
+!songs/bach-invention-8.mid
+!songs/bach-minuet-in-g.mid
 !songs/bach-prelude-in-c.mid
+!songs/burgmuller-arabesque.mid
+!songs/chopin-prelude-op28-no4.mid
+!songs/chopin-prelude-op28-no6.mid
+!songs/chopin-prelude-op28-no7.mid
+!songs/chopin-prelude-op28-no20.mid
+!songs/clementi-sonatina-op36-no1.mid
+!songs/satie-gymnopedie-1.mid
