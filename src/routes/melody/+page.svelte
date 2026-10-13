@@ -16,6 +16,7 @@
 
 	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
 	const SKIP = 5; // s the arrow keys jump
+	const TITLE = 3000; // ms a song played on to shows its title before it starts
 	const SLOW = 300; // ms a song may take to open before the loading card shows: a prepared one opens without a flash
 	const NO_SONGS = 'No songs yet: press A to add a .mid, or drop one on the page.';
 
@@ -45,6 +46,7 @@
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
 	let slowTimer: ReturnType<typeof setTimeout> | undefined;
 	let waitTimer: ReturnType<typeof setInterval> | undefined;
+	let titleTimer: ReturnType<typeof setTimeout> | undefined;
 	let chooser: HTMLInputElement;
 	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
 	const screen = $derived(preparing ? (slow ? 'loading' : undefined) : screenAt({ playing, t: now, run: span }));
@@ -55,9 +57,11 @@
 		return res;
 	}
 
-	/** Prepares the song if it needs to (the server runs prepare.py), then shows it at its start, paused unless `play`. */
-	async function load(name: string, play = false) {
+	/** Prepares the song if it needs to (the server runs prepare.py), then shows it at its start, paused; `playOn`: it
+	 * starts by itself once its title has shown. */
+	async function load(name: string, playOn = false) {
 		const ticket = ++loading;
+		clearTimeout(titleTimer);
 		playback?.dispose();
 		playback = undefined;
 		error = '';
@@ -75,7 +79,7 @@
 			span = withCurtain(duration(data));
 			// at the end, from inside the frame asking the time: what comes next waits for that frame to finish
 			playback = createPlayback(sound, audio!, span.start, span.end, () => setTimeout(playAfter));
-			if (play) playback.play();
+			if (playOn) titleTimer = setTimeout(() => playback?.play(), TITLE);
 			setPreparing(false);
 			void goto(`?song=${encodeURIComponent(name)}`, { shallow: true, replace: true });
 		} catch (e) {
@@ -97,8 +101,9 @@
 		waitTimer = setInterval(() => waited++, 1000);
 	}
 
-	const toggle = () => (playback?.playing ? playback.pause() : playback?.play());
-	const seek = (t: number) => playback?.seek(t);
+	// either takes over from a song waiting to start by itself
+	const toggle = () => (clearTimeout(titleTimer), playback?.playing ? playback.pause() : playback?.play());
+	const seek = (t: number) => (clearTimeout(titleTimer), playback?.seek(t));
 	// from the playback's own clock, not `now`: that only catches up on the next frame, and keys can repeat faster
 	const skip = (by: number) => playback && seek(playback.time() + by);
 
@@ -254,6 +259,7 @@
 		return () => {
 			clearTimeout(idleTimer);
 			clearTimeout(toastTimer);
+			clearTimeout(titleTimer);
 			setPreparing(false);
 			loading++;
 			playback?.dispose();
