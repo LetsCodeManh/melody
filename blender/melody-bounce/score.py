@@ -136,10 +136,14 @@ def pitch_name(pitch, key):
     return name + ("'" * octave if octave > 0 else ',' * -octave)
 
 
-def lengths(steps, into_beat=0, beat=GRID):
-    """Steps as tied note values; one starting into_beat steps past a beat is first tied over at the next beat."""
-    if into_beat:
-        first = min(steps, beat - into_beat)
+def lengths(steps, at=0, beat=GRID, bar=None):
+    """Steps as tied note values, starting at steps past the first downbeat: split at each barline, and one starting
+    off the beat first tied over at the next beat."""
+    if bar and at % bar + steps > bar:
+        first = bar - at % bar
+        return lengths(first, at, beat) + lengths(steps - first, 0, beat, bar)
+    if at % beat:
+        first = min(steps, beat - at % beat)
         return lengths(first) + (lengths(steps - first) if steps > first else [])
     out = []
     for size, name in LENGTHS:
@@ -159,9 +163,9 @@ class Source:
     def add(self, text):
         self.lines.append(text)
 
-    def event(self, indent, chord, steps, rest, into_beat=0, beat=GRID):
+    def event(self, indent, chord, steps, rest, at=0, beat=GRID, bar=None):
         """One chord (or rest) on its own line, split into tied lengths."""
-        parts = lengths(steps, into_beat, beat)
+        parts = lengths(steps, at, beat, bar)
         for k, length in enumerate(parts):
             if chord is None:
                 self.add(indent + rest + length)
@@ -203,10 +207,10 @@ def write(song, path, paged=False):
             at = 0
             for c in voice + [Chord(end, 0, [], [])]:
                 for start, stop, rest in _gap(staff, at, c.start, v == 0, beat):
-                    src.event('  ', None, stop - start, rest, (start - pickup) % beat, beat)
+                    src.event('  ', None, stop - start, rest, start - pickup, beat, bar)
                 if c.length:
                     named = c._replace(pitches=[pitch_name(p, key) for p in c.pitches])
-                    src.event('  ', named, c.length, '', (c.start - pickup) % beat, beat)
+                    src.event('  ', named, c.length, '', c.start - pickup, beat, bar)
                 at = c.start + c.length
             src.add('}')
         src.add('>> }')

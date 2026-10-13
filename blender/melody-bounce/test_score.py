@@ -119,6 +119,13 @@ class SpellingTest(unittest.TestCase):
         self.assertEqual(score.lengths(2, 1, 4), ['8'])
         self.assertEqual(score.lengths(9, 3, 6), ['8.', '4.'])  # in 6/8, the beat a dotted quarter
 
+    def test_a_length_over_a_barline_is_split_there_then_by_the_beat(self):
+        # Satie's held D: a bar of 3/4 and two beats more prints 2.~2, not 1~4 (which LilyPond splits into 2.~4~4)
+        self.assertEqual(score.lengths(20, 0, 4, 12), ['2.', '2'])
+        self.assertEqual(score.lengths(6, 10, 4, 12), ['8', '4'])
+        self.assertEqual(score.lengths(28, 24, 4, 12), ['2.', '2.', '4'])  # over two barlines
+        self.assertEqual(score.lengths(8, -4, 4, 12), ['4', '4'])           # from a one-beat pickup
+
 
 class PrintedTest(unittest.TestCase):
     def test_a_note_split_at_a_barline_is_struck_on_its_leftmost_head_whatever_order_they_are_printed_in(self):
