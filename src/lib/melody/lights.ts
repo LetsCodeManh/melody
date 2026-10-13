@@ -158,6 +158,26 @@ function cometMaterial({ settings }: Prepared, time: { value: number }) {
 // thin at the tail, full near the head (lights.taper)
 const TAPER = /* glsl */ `float taper(float s) { return s < 0.85 ? mix(0.05, 1.0, s / 0.85) : mix(1.0, 0.7, (s - 0.85) / 0.15); }`;
 
+// a tie's printed curve: a cubic Bezier through its first two points (from) and last two (to)
+const TIE = /* glsl */ `
+	vec2 bezier(vec4 from, vec4 to, float u) {
+		float v = 1.0 - u;
+		return v * v * v * from.xy + 3.0 * u * v * v * from.zw + 3.0 * u * u * v * to.xy + u * u * u * to.zw;
+	}
+	vec2 slope(vec4 from, vec4 to, float u) {
+		float v = 1.0 - u;
+		return 3.0 * v * v * (from.zw - from.xy) + 6.0 * u * v * (to.xy - from.zw) + 3.0 * u * u * (to.zw - to.xy);
+	}`;
+
+// a lit head's steady glow t s after its hit: SUSTAIN, cooling to an EMBER, then fading back to ink
+const COOLING = /* glsl */ `
+	float cooling(float t) {
+		const float SUSTAIN = ${SUSTAIN.toFixed(4)}, SETTLE = ${SETTLE.toFixed(4)}, EMBER = ${EMBER.toFixed(4)};
+		const float COOL = ${COOL.toFixed(4)}, DARK = ${DARK.toFixed(4)};
+		float glow = mix(SUSTAIN, EMBER, 1.0 - exp(-max(t - SETTLE, 0.0) / COOL));
+		return glow * (1.0 - smoothstep(SETTLE + COOL, SETTLE + COOL + DARK, t));
+	}`;
+
 /** Each glint: a short comet lying on its tie, RINGS rings of SIDES vertices like the comets'; the shader places them
  * on the tie's curve for the current time. It sets off as the music reaches the tied note's earlier head and reaches
  * the later one as the music does, then runs into it. */
@@ -211,15 +231,7 @@ function glintMaterial(time: { value: number }) {
 			const float WIDTH = ${GLIDE_WIDTH.toFixed(4)}, LIFT = ${INK.toFixed(4)}, GLOW = ${GLIDE_GLOW.toFixed(4)};
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			${TAPER}
-
-			vec2 bezier(float u) {
-				float v = 1.0 - u;
-				return v * v * v * aFrom.xy + 3.0 * u * v * v * aFrom.zw + 3.0 * u * u * v * aTo.xy + u * u * u * aTo.zw;
-			}
-			vec2 slope(float u) {
-				float v = 1.0 - u;
-				return 3.0 * v * v * (aFrom.zw - aFrom.xy) + 6.0 * u * v * (aTo.xy - aFrom.zw) + 3.0 * u * u * (aTo.zw - aTo.xy);
-			}
+			${TIE}
 
 			void main() {
 				float start = aTimes.x, end = aTimes.y;
@@ -228,11 +240,11 @@ function glintMaterial(time: { value: number }) {
 				float tail = uTime < end ? max(head - GLINT, 0.0) : mix(1.0 - GLINT, 1.0, clamp((uTime - end) / DRAIN, 0.0, 1.0));
 				float shown = step(start, uTime) * step(tail + 1e-4, head);
 				float u = mix(tail, head, aRing.x);
-				vec3 tangent = normalize(vec3(slope(u), 0.0) + vec3(1e-6, 0.0, 0.0));
+				vec3 tangent = normalize(vec3(slope(aFrom, aTo, u), 0.0) + vec3(1e-6, 0.0, 0.0));
 				vec3 side = normalize(cross(tangent, vec3(0.0, 0.0, 1.0)));
 				vec3 up = cross(side, tangent);
 				float radius = WIDTH * (0.7 + 0.6 * aLook.w) * taper(aRing.x) * shown;
-				vec3 p = vec3(bezier(u), LIFT) + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
+				vec3 p = vec3(bezier(aFrom, aTo, u), LIFT) + radius * (cos(aRing.y) * side + sin(aRing.y) * up);
 				vColour = mix(aLook.rgb, CORE, ${CORE_SHARE.toFixed(4)}) * GLOW;
 				gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 			}`,
@@ -309,8 +321,8 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 			varying vec4 vLook;
 			const vec3 CORE = vec3(${CORE.toArray().map((c) => c.toFixed(4))});
 			const float FLASH = ${FLASH.toFixed(4)}, SUSTAIN = ${SUSTAIN.toFixed(4)}, SETTLE = ${SETTLE.toFixed(4)};
-			const float FILL = ${FILL.toFixed(4)}, EMBER = ${EMBER.toFixed(4)}, COOL = ${COOL.toFixed(4)};
-			const float DARK = ${DARK.toFixed(4)};
+			const float FILL = ${FILL.toFixed(4)}, EMBER = ${EMBER.toFixed(4)};
+			${COOLING}
 			void main() {
 				// the glow keys in lights.py, then cooling. Struck: dark until a frame before the hit, a flash as heavy
 				// as the note, settling to a steady glow. Held: once the music reaches it, filling with the steady glow
@@ -318,8 +330,7 @@ function headMaterial({ settings }: Prepared, time: { value: number }) {
 				// an ember and fade back to ink.
 				float t = uTime - vHit;
 				float flash = FLASH * (0.5 + vLook.w);
-				float steady = mix(SUSTAIN, EMBER, 1.0 - exp(-max(t - SETTLE, 0.0) / COOL));
-				steady *= 1.0 - smoothstep(SETTLE + COOL, SETTLE + COOL + DARK, t);
+				float steady = cooling(t);
 				float front = mix(-1.3, 1.3, clamp(t / FILL, 0.0, 1.0));
 				float glow = vStruck < 0.5 ? steady * (1.0 - smoothstep(front - 0.3, front + 0.3, vAcross))
 					: t < -uFrame ? 0.0
