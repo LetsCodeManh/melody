@@ -130,6 +130,19 @@
 		text-align: center;
 		letter-spacing: 0.12em;
 	}
+	& .add {
+		margin-top: 14px;
+		border: 0;
+		font-size: 10.5px;
+		letter-spacing: 0.2em;
+		text-align: center;
+		text-transform: uppercase;
+	}
+	& .add:hover,
+	& .add:focus-visible {
+		background: none;
+		text-shadow: 0 0 14px rgb(255 214 150 / 0.7);
+	}
 	& .hint {
 		padding-top: 24px;
 		border: 0;

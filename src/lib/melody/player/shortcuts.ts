@@ -6,6 +6,7 @@ export type Action =
 	| 'next'
 	| 'previous'
 	| 'songs'
+	| 'add'
 	| 'hide'
 	| 'fullscreen'
 	| 'skin'
@@ -31,6 +32,7 @@ export const SHORTCUTS: Shortcut[] = [
 	{ action: 'next', keys: ['n'], show: 'N', does: 'Next song' },
 	{ action: 'previous', keys: ['p'], show: 'P', does: 'Previous song' },
 	{ action: 'songs', keys: ['s', '/'], show: 'S', does: 'Pick a song' },
+	{ action: 'add', keys: ['a'], show: 'A', does: 'Add a song (.mid), or drop one on the page' },
 	{ action: 'hide', keys: ['h'], show: 'H', does: 'Hide / show the player' },
 	{ action: 'fullscreen', keys: ['f'], show: 'F', does: 'Full screen' },
 	{ action: 'skin', keys: ['t'], shift: false, show: 'T', does: 'Next player style' },

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { error } from '@sveltejs/kit';
@@ -11,6 +11,7 @@ const SONGS = path.join(ROOT, 'songs');
 // a change to any of these changes what prepare.py writes
 const SOURCES = ['prepare.py', 'midi.py', 'score.py', 'flight.py', 'synth.py', 'settings.py'].map((f) => path.join(ROOT, f));
 const NAME = /^[\w-]+$/;
+const LARGEST = 2 * 1024 * 1024; // bytes: a long piano piece is well under 200 KB
 
 /** prepare.py's output, with the paths of the files it wrote. */
 export interface PreparedFiles extends Prepared {
@@ -20,6 +21,36 @@ export interface PreparedFiles extends Prepared {
 
 export async function listSongs(): Promise<string[]> {
 	return (await readdir(SONGS)).filter((f) => f.endsWith('.mid')).map((f) => f.slice(0, -4)).sort();
+}
+
+/** A song's name from its file's: lower case, words joined by dashes ("All of Me (Piano).mid" → "all-of-me-piano"). */
+export function songName(file: string): string {
+	const name = file
+		.replace(/\.midi?$/i, '')
+		.normalize('NFKD')
+		.replace(/[\u0300-\u036f]/g, '') // accents off: é → e
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 60)
+		.replace(/-+$/, '');
+	if (!name) throw new RangeError(`"${file}" has no letters or digits to name the song by`);
+	return name;
+}
+
+/** Throws unless the bytes look like a standard MIDI file of a sensible size. */
+export function checkMidi(bytes: Uint8Array): void {
+	if (bytes.length > LARGEST) throw new RangeError(`the file is ${(bytes.length / 1048576).toFixed(1)} MB; a MIDI over 2 MB isn't a song`);
+	if (bytes.length < 14 || new TextDecoder().decode(bytes.subarray(0, 4)) !== 'MThd') throw new RangeError('not a MIDI file (.mid)');
+}
+
+/** Saves an uploaded MIDI into songs/ and returns the song's name. Never replaces a song: an existing name throws
+ * (code EEXIST). Whether it engraves is found out when it is first prepared. */
+export async function addSong(file: string, bytes: Uint8Array): Promise<string> {
+	checkMidi(bytes);
+	const name = songName(file);
+	await writeFile(path.join(SONGS, name + '.mid'), bytes, { flag: 'wx' });
+	return name;
 }
 
 const running = new Map<string, Promise<unknown>>();

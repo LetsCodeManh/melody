@@ -6,9 +6,11 @@
 		current: string;
 		onPick: (song: string) => void;
 		onClose: () => void;
+		/** asks for a .mid to add to the songs */
+		onAdd: () => void;
 	}
 
-	let { songs, current, onPick, onClose }: Props = $props();
+	let { songs, current, onPick, onClose, onAdd }: Props = $props();
 
 	let query = $state('');
 	let field: HTMLInputElement;
@@ -53,6 +55,7 @@
 				<li class="none">No song matches</li>
 			{/each}
 		</ul>
+		<button class="add" onclick={onAdd}>Add a song <span>.mid, or drop one on the page</span></button>
 		<p class="hint">↑ ↓ to move · Enter to play · Esc to close</p>
 	</div>
 </div>

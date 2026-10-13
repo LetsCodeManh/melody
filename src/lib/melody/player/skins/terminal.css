@@ -131,6 +131,20 @@
 	& .none {
 		padding: 1px 14px;
 	}
+	& .add {
+		padding: 4px 14px;
+		border-top: 1px dashed rgb(232 217 176 / 0.25);
+		font-size: inherit;
+	}
+	& .add::before {
+		content: '$ ';
+		opacity: 0.6;
+	}
+	& .add:hover,
+	& .add:focus-visible {
+		background: #e8d9b0;
+		color: #000;
+	}
 	& .hint {
 		padding: 6px 14px;
 		border-top: 1px dashed rgb(232 217 176 / 0.25);

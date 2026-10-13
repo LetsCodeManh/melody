@@ -154,6 +154,24 @@
 		text-transform: lowercase;
 		opacity: 0.8;
 	}
+	& .add {
+		width: calc(100% - 44px);
+		margin: 0 22px;
+		padding: 10px 0;
+		border-top: 1px solid rgb(217 181 106 / 0.25);
+		font-size: 15px;
+		font-style: italic;
+		text-align: center;
+	}
+	& .add::before {
+		content: '✦ ';
+		font-style: normal;
+	}
+	& .add:hover,
+	& .add:focus-visible {
+		background: none;
+		color: #f0dcae;
+	}
 	& .hint {
 		margin: 0 22px;
 		padding: 10px 0 14px;

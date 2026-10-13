@@ -35,6 +35,7 @@
 	let toast = $state('');
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+	let chooser: HTMLInputElement;
 	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
 
 	async function fetchOk(url: string) {
@@ -95,6 +96,33 @@
 		load(name);
 	}
 
+	/** Saves a dropped or chosen .mid as a new song and opens it; the server says what's wrong with one it won't take. */
+	async function addSong(file: File) {
+		picking = false;
+		say(`Adding ${file.name}…`);
+		try {
+			const form = new FormData();
+			form.append('file', file);
+			const res = await fetch('/api/melody', { method: 'POST', body: form });
+			const body = await res.json().catch(() => null);
+			if (!res.ok) throw new Error(body?.message ?? res.statusText);
+			songs = await (await fetchOk('/api/melody')).json();
+			say(`Added ${body.song}`);
+			pick(body.song);
+		} catch (e) {
+			say(`${file.name}: ${(e as Error).message}`);
+		}
+	}
+
+	const dragsFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+
+	function onDrop(e: DragEvent) {
+		if (!dragsFiles(e)) return;
+		e.preventDefault();
+		const file = e.dataTransfer!.files[0];
+		if (file) addSong(file);
+	}
+
 	function setSkin(next: Skin) {
 		skin = next;
 		localStorage.setItem('melody.skin', next);
@@ -110,6 +138,7 @@
 		next: () => songs.length && pick(songs[(songs.indexOf(song) + 1) % songs.length]),
 		previous: () => songs.length && pick(songs[(songs.indexOf(song) - 1 + songs.length) % songs.length]),
 		songs: () => ((helping = false), (picking = true)),
+		add: () => chooser.click(),
 		hide: () => {
 			hidden = !hidden;
 			if (hidden) say('Player hidden · H to show it');
@@ -167,7 +196,13 @@
 </script>
 
 <svelte:head><title>Melody</title></svelte:head>
-<svelte:window onkeydown={onKey} onpointermove={wake} onpointerdown={wake} />
+<svelte:window
+	onkeydown={onKey}
+	onpointermove={wake}
+	onpointerdown={wake}
+	ondragover={(e) => dragsFiles(e) && e.preventDefault()}
+	ondrop={onDrop}
+/>
 
 <div class="stage" class:quiet={away} bind:this={host}></div>
 
@@ -185,7 +220,19 @@
 		onSongs={() => (picking = true)}
 	/>
 
-	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} />{/if}
+	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={() => chooser.click()} />{/if}
+	<input
+		class="chooser"
+		type="file"
+		accept=".mid,.midi,audio/midi,audio/x-midi"
+		aria-label="Add a song"
+		bind:this={chooser}
+		onchange={(e) => {
+			const file = e.currentTarget.files?.[0];
+			e.currentTarget.value = ''; // so choosing the same file again still counts
+			if (file) addSong(file);
+		}}
+	/>
 	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
 
 	<div class="status" role="status">
@@ -210,5 +257,8 @@
 	}
 	.stage.quiet {
 		cursor: none;
+	}
+	.chooser {
+		display: none;
 	}
 </style>
