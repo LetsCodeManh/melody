@@ -256,6 +256,49 @@
 		background: rgb(255 255 255 / 0.06);
 		opacity: 1;
 	}
+	& .adder {
+		width: min(420px, calc(100vw - 32px));
+	}
+	& .drop {
+		all: unset;
+		box-sizing: border-box;
+		display: block;
+		width: 100%;
+		padding: 28px 16px;
+		border: 1px dashed rgb(255 255 255 / 0.25);
+		border-radius: 12px;
+		text-align: center;
+		cursor: pointer;
+	}
+	& .drop span {
+		display: block;
+		margin-top: 4px;
+		font-size: 12px;
+		opacity: 0.55;
+	}
+	& .drop:hover,
+	& .drop:focus-visible,
+	& .drop.over {
+		border-color: rgb(255 255 255 / 0.6);
+		background: rgb(255 255 255 / 0.06);
+	}
+	& .guide {
+		margin-top: 16px;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+	& .guide p,
+	& .guide ul {
+		margin: 0 0 8px;
+		opacity: 0.75;
+	}
+	& .guide ul {
+		padding-left: 16px;
+	}
+	& .guide a {
+		color: inherit;
+		text-underline-offset: 2px;
+	}
 	& .hint {
 		margin: 0;
 		padding: 9px 18px 11px;

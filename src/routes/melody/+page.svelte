@@ -8,6 +8,7 @@
 	import Player from '#lib/melody/player/Player.svelte';
 	import SongPicker from '#lib/melody/player/SongPicker.svelte';
 	import Shortcuts from '#lib/melody/player/Shortcuts.svelte';
+	import AddSong from '#lib/melody/player/AddSong.svelte';
 	import Card from '#lib/melody/player/Card.svelte';
 	import { screenAt, withCurtain } from '#lib/melody/curtain.ts';
 	import { actionFor, type Action } from '#lib/melody/player/shortcuts.ts';
@@ -41,6 +42,7 @@
 	let hover = $state(false);
 	let picking = $state(false);
 	let helping = $state(false);
+	let adding = $state(false);
 	let toast = $state('');
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -48,7 +50,7 @@
 	let waitTimer: ReturnType<typeof setInterval> | undefined;
 	let titleTimer: ReturnType<typeof setTimeout> | undefined;
 	let chooser: HTMLInputElement;
-	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping));
+	const away = $derived(hidden || (playing && idle && !hover && !picking && !helping && !adding));
 	const screen = $derived(preparing ? (slow ? 'loading' : undefined) : screenAt({ playing, t: now, run: span }));
 
 	async function fetchOk(url: string, init?: RequestInit) {
@@ -144,7 +146,7 @@
 
 	/** Saves a dropped or chosen .mid as a new song and opens it; the server says what's wrong with one it won't take. */
 	async function addSong(file: File) {
-		picking = false;
+		picking = adding = false;
 		say(`Adding ${file.name}…`);
 		try {
 			const form = new FormData();
@@ -183,6 +185,8 @@
 		}
 	}
 
+	const openAdding = () => ((picking = helping = false), (adding = true));
+
 	const dragsFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
 
 	function onDrop(e: DragEvent) {
@@ -208,7 +212,7 @@
 		previous: () => songs.length && pick(songs[(songs.indexOf(song) - 1 + songs.length) % songs.length]),
 		afterwards: () => setAfterwards(afterwardsAfter(afterwards)),
 		songs: () => ((helping = false), (picking = true)),
-		add: () => chooser.click(),
+		add: openAdding,
 		hide: () => {
 			hidden = !hidden;
 			if (hidden) say('Player hidden · H to show it');
@@ -219,15 +223,15 @@
 			),
 		skin: () => setSkin(skinAfter(skin, 1)),
 		skinBack: () => setSkin(skinAfter(skin, -1)),
-		help: () => ((picking = false), (helping = !helping)),
-		close: () => (picking = helping = false)
+		help: () => ((picking = adding = false), (helping = !helping)),
+		close: () => (picking = helping = adding = false)
 	};
 
 	function onKey(e: KeyboardEvent) {
 		const t = e.target;
 		const target = t instanceof HTMLInputElement && t.type !== 'range' ? 'text' : t instanceof HTMLButtonElement ? 'button' : 'other';
 		const action = actionFor(e, target);
-		if (!action || (picking && action !== 'close')) return;
+		if (!action || ((picking || adding) && action !== 'close')) return;
 		e.preventDefault();
 		wake();
 		actions[action]();
@@ -294,7 +298,7 @@
 		onSongs={() => (picking = true)}
 	/>
 
-	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={() => chooser.click()} onDelete={deleteSong} />{/if}
+	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={openAdding} onDelete={deleteSong} />{/if}
 	<input
 		class="chooser"
 		type="file"
@@ -308,6 +312,7 @@
 		}}
 	/>
 	{#if helping}<Shortcuts onClose={() => (helping = false)} />{/if}
+	{#if adding}<AddSong onChoose={() => chooser.click()} onClose={() => (adding = false)} />{/if}
 
 	<Card {screen} {song} {waited} {afterwards} />
 

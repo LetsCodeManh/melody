@@ -130,6 +130,13 @@
 		text-align: center;
 		letter-spacing: 0.12em;
 	}
+	& .guide {
+		text-align: center;
+	}
+	& .guide ul {
+		padding: 0;
+		list-style: none;
+	}
 	& .add {
 		margin-top: 14px;
 		border: 0;
