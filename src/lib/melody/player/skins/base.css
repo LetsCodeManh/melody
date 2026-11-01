@@ -54,6 +54,35 @@
 			fill: currentColor;
 		}
 
+		/* a touch screen's buttons for what the keys do: previous, next, after each song, full screen */
+		& .tap {
+			display: grid;
+			place-items: center;
+			flex: none;
+			width: 40px;
+			height: 40px;
+			opacity: 0.8;
+		}
+		& .tap svg {
+			width: 22px;
+			height: 22px;
+			fill: none;
+			stroke: currentColor;
+			stroke-width: 1.6;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+		}
+		& .tap .solid {
+			fill: currentColor;
+			stroke: none;
+		}
+		& .repeat {
+			opacity: 0.4;
+		}
+		& .repeat.on {
+			opacity: 1;
+		}
+
 		& .title {
 			display: flex;
 			flex-direction: column;
@@ -229,6 +258,15 @@
 	}
 	& .songs li:has(.trash) .song.current::after {
 		margin-right: 30px;
+	}
+	/* the picker's key hints and the cards' "Space to play": only where there are keys */
+	@media not ((hover: hover) and (pointer: fine)) {
+		& .hint {
+			display: none;
+		}
+		& .card .cue {
+			visibility: hidden;
+		}
 	}
 	& .none {
 		padding: 9px 12px;

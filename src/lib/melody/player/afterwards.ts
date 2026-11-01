@@ -22,3 +22,10 @@ export function songAfter(songs: string[], song: string, afterwards: Afterwards)
 	if (afterwards === 'again') return song;
 	return songs[(songs.indexOf(song) + 1) % songs.length];
 }
+
+/** What previous or next (`by`) does `into` seconds into `song`: the song along, wrapping round, or, for previous
+ * past the song's first `restarts` seconds, its own start again, as on a music player. */
+export function stepFrom(songs: string[], song: string, by: 1 | -1, into: number, restarts: number): { restart: true } | { song: string } {
+	if (by < 0 && into > restarts) return { restart: true };
+	return { song: songs[(((songs.indexOf(song) + by) % songs.length) + songs.length) % songs.length] };
+}

@@ -14,11 +14,12 @@
 	import { actionFor, SHORTCUTS, type Action } from '#lib/melody/player/shortcuts.ts';
 	import { library } from '#lib/melody/library.ts';
 	import { SKINS, skinAfter, type Skin } from '#lib/melody/player/skins.ts';
-	import { AFTERWARDS, afterwardsAfter, songAfter, type Afterwards } from '#lib/melody/player/afterwards.ts';
+	import { AFTERWARDS, afterwardsAfter, songAfter, stepFrom, type Afterwards } from '#lib/melody/player/afterwards.ts';
 
 	const IDLE = 3000; // ms without the pointer moving before the playing player fades away
 	const SKIP = 5; // s the arrow keys jump
 	const TITLE = 3000; // ms a song played on to shows its title before it starts
+	const RESTARTS = 3; // s into a song after which previous goes back to its start, as on a music player
 	const SLOW = 300; // ms a song may take to open before the loading card shows: a prepared one opens without a flash
 	const songsAt = library(import.meta.env.DEV);
 	const NO_SONGS = songsAt.editable ? 'No songs yet: press A to add a .mid, or drop one on the page.' : 'No songs published yet.';
@@ -47,6 +48,10 @@
 	let picking = $state(false);
 	let helping = $state(false);
 	let adding = $state(false);
+	// a touch screen: one look (Hairline), no messages, the keys' controls on the player. No keys there.
+	let touch = $state(false);
+	let canFull = $state(false);
+	let fullscreen = $state(false);
 	let toast = $state('');
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -113,7 +118,9 @@
 	// from the playback's own clock, not `now`: that only catches up on the next frame, and keys can repeat faster
 	const skip = (by: number) => playback && seek(playback.time() + by);
 
-	function say(text: string) {
+	/** A message for a moment. `always`: a failure, shown on a touch screen too; there, what a tap did shows itself. */
+	function say(text: string, always = false) {
+		if (touch && !always) return;
 		toast = text;
 		clearTimeout(toastTimer);
 		toastTimer = setTimeout(() => (toast = ''), 2200);
@@ -130,6 +137,17 @@
 		if (name === song) return;
 		song = name;
 		load(name);
+	}
+
+	/** The song `by` along, wrapping round, playing on if one plays now; previous, past its first seconds, goes back to
+	 * its start instead. */
+	function step(by: 1 | -1) {
+		if (!songs.length || !playback) return;
+		const to = stepFrom(songs, song, by, playback.time() - span.start, RESTARTS);
+		if ('restart' in to) return seek(span.start);
+		const playOn = playback.playing;
+		song = to.song;
+		load(to.song, playOn);
 	}
 
 	/** A song has played to its end: what comes after it, as `afterwards` says. */
@@ -162,7 +180,7 @@
 			say(`Added ${body.song}`);
 			pick(body.song);
 		} catch (e) {
-			say(`${file.name}: ${(e as Error).message}`);
+			say(`${file.name}: ${(e as Error).message}`, true);
 		}
 	}
 
@@ -185,7 +203,7 @@
 			stage?.clear();
 			error = NO_SONGS;
 		} catch (e) {
-			say(`${name}: ${(e as Error).message}`);
+			say(`${name}: ${(e as Error).message}`, true);
 		}
 	}
 
@@ -196,12 +214,13 @@
 	function onDrop(e: DragEvent) {
 		if (!dragsFiles(e)) return;
 		e.preventDefault(); // even where it can't be added: the browser would leave the page to open the file
-		if (!songsAt.editable) return say('Songs are added where the site is built from: see the README');
+		if (!songsAt.editable) return say('Songs are added where the site is built from: see the README', true);
 		const file = e.dataTransfer!.files[0];
 		if (file) addSong(file);
 	}
 
 	function setSkin(next: Skin) {
+		if (touch) return; // one look on a touch screen
 		skin = next;
 		localStorage.setItem('melody.skin', next);
 		const i = SKINS.findIndex((s) => s.id === next);
@@ -220,11 +239,11 @@
 		add: () => songsAt.editable && openAdding(),
 		hide: () => {
 			hidden = !hidden;
-			if (hidden) say('Player hidden · H to show it');
+			if (hidden) say('Player hidden · H or a tap on the scene to show it');
 		},
 		fullscreen: () =>
 			void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch((e: Error) =>
-				say(`Full screen: ${e.message}`)
+				say(`Full screen: ${e.message}`, true)
 			),
 		skin: () => setSkin(skinAfter(skin, 1)),
 		skinBack: () => setSkin(skinAfter(skin, -1)),
@@ -243,8 +262,10 @@
 	}
 
 	onMount(() => {
+		touch = !matchMedia('(hover: hover) and (pointer: fine)').matches;
+		canFull = document.fullscreenEnabled; // false on an iPhone: Safari there lets only a video fill the screen
 		const saved = localStorage.getItem('melody.skin');
-		if (saved) skin = skinAfter(saved, 0);
+		if (saved && !touch) skin = skinAfter(saved, 0);
 		const after = localStorage.getItem('melody.afterwards');
 		afterwards = AFTERWARDS.find((a) => a.id === after)?.id ?? 'stop';
 		wake();
@@ -283,11 +304,14 @@
 	onkeydown={onKey}
 	onpointermove={wake}
 	onpointerdown={wake}
+	onfullscreenchange={() => (fullscreen = !!document.fullscreenElement)}
 	ondragover={(e) => dragsFiles(e) && e.preventDefault()}
 	ondrop={onDrop}
 />
 
-<div class="stage" class:quiet={away} bind:this={host}></div>
+<!-- a tap on the scene brings a hidden player back, as H does -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="stage" class:quiet={away} bind:this={host} onpointerdown={() => (hidden = false)}></div>
 
 <div class="melody" data-skin={skin}>
 	<Player
@@ -301,6 +325,12 @@
 		onToggle={toggle}
 		onSeek={seek}
 		onSongs={() => (picking = true)}
+		{afterwards}
+		{fullscreen}
+		onPrevious={touch ? () => step(-1) : undefined}
+		onNext={touch ? () => step(1) : undefined}
+		onAfterwards={touch ? actions.afterwards : undefined}
+		onFullscreen={touch && canFull ? actions.fullscreen : undefined}
 	/>
 
 	{#if picking}<SongPicker {songs} current={song} onPick={pick} onClose={() => (picking = false)} onAdd={songsAt.editable ? openAdding : undefined} onDelete={songsAt.editable ? deleteSong : undefined} />{/if}
