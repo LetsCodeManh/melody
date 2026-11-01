@@ -21,7 +21,8 @@
 	let at = $state(untrack(() => Math.max(songs.indexOf(current), 0)));
 	const chosen = $derived(Math.min(at, shown.length - 1));
 
-	$effect(() => field.focus());
+	// not on a touch screen: its keyboard would open over the songs
+	$effect(() => void (matchMedia('(pointer: fine)').matches && field.focus()));
 
 	function onKey(e: KeyboardEvent) {
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
